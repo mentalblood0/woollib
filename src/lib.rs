@@ -1,3 +1,5 @@
+mod id_serializer;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use trove::{Chest, ChestConfig};
