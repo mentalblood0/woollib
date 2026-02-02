@@ -385,7 +385,6 @@ mod tests {
                                 tags: vec![],
                             };
                             thesis.validate().unwrap();
-                            dbg!(&thesis);
                             transaction.insert_thesis(thesis.clone()).unwrap();
                             previously_added_theses.insert(thesis.id().unwrap(), thesis);
                         }

@@ -1028,9 +1028,10 @@ dependencies = [
 [[package]]
 name = "trove"
 version = "0.1.0"
-source = "git+https://github.com/mentalblood0/trove#8076f2fced2f495e1d475cb5f7a6e754dacd8413"
+source = "git+https://github.com/mentalblood0/trove#33e97b3ed90ff3273c55cdbb28415d31983a570e"
 dependencies = [
  "anyhow",
+ "base64",
  "bincode",
  "dream",
  "fallible-iterator",
