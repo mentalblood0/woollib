@@ -2,7 +2,7 @@ mod id_serializer;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use trove::{Chest, ChestConfig};
+use trove::{Chest, ChestConfig, ObjectId};
 
 pub struct Sweater {
     pub chest: Chest,
@@ -27,12 +27,9 @@ impl Sweater {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Id(String);
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Mention {
-    mentioned: Id,
-    inside: Id,
+    mentioned: ObjectId,
+    inside: ObjectId,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -43,8 +40,8 @@ pub struct RelationKind(String);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Relation {
-    from: Id,
-    to: Id,
+    from: ObjectId,
+    to: ObjectId,
     kind: RelationKind,
 }
 
