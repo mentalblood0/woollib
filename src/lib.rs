@@ -211,10 +211,33 @@ mod tests {
                     };
                     match action_id {
                         1 => {
-                            let thesis = Thesis {
-                                content: Content::Text(Text(random_string(&mut rng))),
-                                tags: vec![],
-                            };
+                            let thesis =
+                                Thesis {
+                                    content: match rng.generate_range(1..2) {
+                                        1 => Content::Text(Text(random_string(&mut rng))),
+                                        2 => Content::Relation(Relation {
+                                            from: previously_added_theses
+                                                .keys()
+                                                .nth(rng.generate_range(
+                                                    0..previously_added_theses.len(),
+                                                ))
+                                                .unwrap()
+                                                .clone(),
+                                            to: previously_added_theses
+                                                .keys()
+                                                .nth(rng.generate_range(
+                                                    0..previously_added_theses.len(),
+                                                ))
+                                                .unwrap()
+                                                .clone(),
+                                            kind: RelationKind("relation_kind".to_string()),
+                                        }),
+                                        _ => {
+                                            panic!()
+                                        }
+                                    },
+                                    tags: vec![],
+                                };
                             transaction.insert_thesis(thesis.clone()).unwrap();
                             previously_added_theses.insert(thesis.id().unwrap(), thesis);
                         }
