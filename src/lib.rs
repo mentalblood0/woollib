@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::{Context, Result, anyhow};
 use fancy_regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -29,7 +31,7 @@ static TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 impl Text {
     pub fn validate(&self) -> Result<()> {
         let sentence_regex = TEXT_REGEX.get_or_init(|| {
-            Regex::new(r#"^(?=.*[a-zA-Zа-яА-ЯёЁ])[a-zA-Zа-яА-ЯёЁ\s,;:'"\-–—()]+$"#)
+            Regex::new(r#"^(?=.*[a-zA-Zа-яА-ЯёЁ])[a-zA-Zа-яА-ЯёЁ\s,'"\-]+$"#)
                 .with_context(|| "Can not compile regular expression for text validation")
                 .unwrap()
         });
@@ -46,7 +48,7 @@ impl Text {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RelationKind(String);
 
 static RELATION_KIND_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -150,21 +152,25 @@ impl Thesis {
     }
 }
 
-pub struct Sweater {
-    pub chest: Chest,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SweaterConfig {
     pub chest: ChestConfig,
+    pub supported_relations_kinds: BTreeSet<RelationKind>,
+}
+
+pub struct Sweater {
+    pub chest: Chest,
+    pub config: SweaterConfig,
 }
 
 pub struct WriteTransaction<'a, 'b, 'c, 'd> {
     pub chest_transaction: &'a mut trove::WriteTransaction<'b, 'c, 'd>,
+    pub sweater_config: SweaterConfig,
 }
 
 pub struct ReadTransaction<'a> {
     pub chest_transaction: &'a trove::ReadTransaction<'a>,
+    pub sweater_config: SweaterConfig,
 }
 
 impl Sweater {
@@ -176,6 +182,7 @@ impl Sweater {
                     config.chest
                 )
             })?,
+            config: config,
         })
     }
 
@@ -187,6 +194,7 @@ impl Sweater {
             .lock_all_and_write(|chest_write_transaction| {
                 f(&mut WriteTransaction {
                     chest_transaction: chest_write_transaction,
+                    sweater_config: self.config.clone(),
                 })
             })
             .with_context(|| "Can not lock chest and initiate write transaction")?;
@@ -202,6 +210,7 @@ impl Sweater {
             .lock_all_writes_and_read(|chest_read_transaction| {
                 f(ReadTransaction {
                     chest_transaction: &chest_read_transaction,
+                    sweater_config: self.config.clone(),
                 })
             })
             .with_context(
@@ -233,6 +242,23 @@ impl WriteTransaction<'_, '_, '_, '_> {
                 "Can not insert thesis {thesis:?} with id {thesis_id:?} as chest already contains object with such id"
             ))
         } else {
+            if let Content::Relation(Relation {
+                from: _,
+                to: _,
+                kind: ref relation_kind,
+            }) = thesis.content
+            {
+                if !self
+                    .sweater_config
+                    .supported_relations_kinds
+                    .contains(&relation_kind)
+                {
+                    return Err(anyhow!(
+                        "Can not insert relation {thesis:?} of kind {relation_kind:?} in sweater with supported relations kinds {:?} as it's kind is not supported",
+                        self.sweater_config.supported_relations_kinds
+                    ));
+                }
+            }
             self.chest_transaction.insert_with_id(Object {
                 id: thesis_id,
                 value: serde_json::to_value(thesis)?,
@@ -269,7 +295,7 @@ mod tests {
 
     fn random_text(rng: &mut WyRand) -> Text {
         const LETTERS: &str = "abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
-        const PUNCTUATION: &[&str] = &[", ", "; ", ": ", " - ", " (", ") "];
+        const PUNCTUATION: &[&str] = &[", "];
         let word_count = rng.generate_range(3..=10);
         let letters: Vec<char> = LETTERS.chars().collect();
         let words: Vec<String> = (0..word_count)
@@ -294,21 +320,6 @@ mod tests {
         Text(result)
     }
 
-    fn random_relation_kind(rng: &mut WyRand) -> RelationKind {
-        const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
-        let word_count = rng.generate_range(1..=5);
-        let letters: Vec<char> = LETTERS.chars().collect();
-        let words: Vec<String> = (0..word_count)
-            .map(|_| {
-                let len = rng.generate_range(2..=8);
-                (0..len)
-                    .map(|_| letters[rng.generate_range(0..letters.len())])
-                    .collect()
-            })
-            .collect();
-        RelationKind(words.join(" "))
-    }
-
     #[test]
     fn test_generative() {
         let mut sweater = new_default_sweater("test_generative");
@@ -327,9 +338,14 @@ mod tests {
                     };
                     match action_id {
                         1 => {
-                            let thesis =
-                                Thesis {
-                                    content: match rng.generate_range(1..2) {
+                            let thesis = Thesis {
+                                content: {
+                                    let action_id = if previously_added_theses.is_empty() {
+                                        1
+                                    } else {
+                                        rng.generate_range(1..=2)
+                                    };
+                                    match action_id {
                                         1 => Content::Text(random_text(&mut rng)),
                                         2 => Content::Relation(Relation {
                                             from: previously_added_theses
@@ -346,15 +362,30 @@ mod tests {
                                                 ))
                                                 .unwrap()
                                                 .clone(),
-                                            kind: random_relation_kind(&mut rng),
+                                            kind: transaction
+                                                .sweater_config
+                                                .supported_relations_kinds
+                                                .iter()
+                                                .nth(
+                                                    rng.generate_range(
+                                                        0..transaction
+                                                            .sweater_config
+                                                            .supported_relations_kinds
+                                                            .len(),
+                                                    ),
+                                                )
+                                                .unwrap()
+                                                .clone(),
                                         }),
                                         _ => {
                                             panic!()
                                         }
-                                    },
-                                    tags: vec![],
-                                };
+                                    }
+                                },
+                                tags: vec![],
+                            };
                             thesis.validate().unwrap();
+                            dbg!(&thesis);
                             transaction.insert_thesis(thesis.clone()).unwrap();
                             previously_added_theses.insert(thesis.id().unwrap(), thesis);
                         }

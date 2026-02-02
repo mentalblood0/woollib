@@ -1,3 +1,10 @@
+supported_relations_kinds:
+  - answers
+  - negates
+  - may be
+  - means
+  - therefore
+  - includes
 chest:
   index:
     database:
