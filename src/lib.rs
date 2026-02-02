@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use fancy_regex::Regex;
 use serde::{Deserialize, Serialize};
 use trove::{Chest, ChestConfig, Object, ObjectId};
 
@@ -23,8 +24,46 @@ impl Mention {
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
 pub struct Text(String);
 
+static TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
+impl Text {
+    pub fn validate(&self) -> Result<()> {
+        let sentence_regex = TEXT_REGEX.get_or_init(|| {
+            Regex::new(r#"^(?=.*[a-zA-Zа-яА-ЯёЁ])[a-zA-Zа-яА-ЯёЁ\s,;:'"\-–—()]+$"#)
+                .with_context(|| "Can not compile regular expression for text validation")
+                .unwrap()
+        });
+        if sentence_regex.is_match(&self.0).with_context(|| "Regex matching failed")? {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Text must be one English or Russian sentence with no punctuation at the end"
+            ))
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
 pub struct RelationKind(String);
+
+static RELATION_KIND_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
+impl RelationKind {
+    pub fn validate(&self) -> Result<()> {
+        let sentence_regex = RELATION_KIND_REGEX.get_or_init(|| {
+            Regex::new(r"^(?=.*[a-zA-Z])[a-zA-Z\s]+$")
+                .with_context(|| "Can not compile regular expression for relation kind validation")
+                .unwrap()
+        });
+        if sentence_regex.is_match(&self.0).with_context(|| "Regex matching failed")? {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Relation kind must contain only English words with no punctuation"
+            ))
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
 pub struct Relation {
@@ -49,6 +88,23 @@ impl Content {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Tag(String);
+
+static TAG_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
+impl Tag {
+    pub fn validate(&self) -> Result<()> {
+        let re = TAG_REGEX.get_or_init(|| {
+            Regex::new(r"^\w+$")
+                .with_context(|| "Can not compile regular expression for tag validation")
+                .unwrap()
+        });
+        if re.is_match(&self.0).with_context(|| "Regex matching failed")? {
+            Ok(())
+        } else {
+            Err(anyhow!("Tag must be a word symbols sequence"))
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Thesis {
@@ -181,24 +237,55 @@ mod tests {
         .unwrap()
     }
 
-    fn random_string(rng: &mut WyRand) -> String {
-        loop {
-            let result: String = (0..rng.generate_range(32..128))
-                .map(|_| {
-                    let c = rng.generate_range(32..127) as u8 as char;
-                    c
-                })
-                .collect();
-            if result.parse::<u32>().is_err() {
-                return result;
+    fn random_text(rng: &mut WyRand) -> Text {
+        const LETTERS: &str = "abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
+        const PUNCTUATION: &[&str] = &[", ", "; ", ": ", " - ", " (", ") "];
+        let word_count = rng.generate_range(3..=10);
+        let letters: Vec<char> = LETTERS.chars().collect();
+        let words: Vec<String> = (0..word_count)
+            .map(|_| {
+                let len = rng.generate_range(2..=8);
+                (0..len)
+                    .map(|_| letters[rng.generate_range(0..letters.len())])
+                    .collect()
+            })
+            .collect();
+        let mut result = String::new();
+        for (i, word) in words.iter().enumerate() {
+            result.push_str(word);
+            if i < words.len() - 1 {
+                if rng.generate_range(0..3) == 0 {
+                    result.push_str(PUNCTUATION[rng.generate_range(0..PUNCTUATION.len())]);
+                } else {
+                    result.push(' ');
+                }
             }
         }
+        Text(result)
+    }
+
+    fn random_relation_kind(rng: &mut WyRand) -> RelationKind {
+        const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
+        let word_count = rng.generate_range(3..=10);
+        let letters: Vec<char> = LETTERS.chars().collect();
+        let words: Vec<String> = (0..word_count)
+            .map(|_| {
+                let len = rng.generate_range(2..=8);
+                (0..len)
+                    .map(|_| letters[rng.generate_range(0..letters.len())])
+                    .collect()
+            })
+            .collect();
+        RelationKind(words.join(" "))
     }
 
     #[test]
     fn test_generative() {
         let mut sweater = new_default_sweater("test_generative");
         let mut rng = WyRand::new_seed(0);
+
+        random_text(&mut rng).validate().unwrap();
+        random_relation_kind(&mut rng).validate().unwrap();
 
         sweater
             .lock_all_and_write(|transaction| {
@@ -214,7 +301,7 @@ mod tests {
                             let thesis =
                                 Thesis {
                                     content: match rng.generate_range(1..2) {
-                                        1 => Content::Text(Text(random_string(&mut rng))),
+                                        1 => Content::Text(random_text(&mut rng)),
                                         2 => Content::Relation(Relation {
                                             from: previously_added_theses
                                                 .keys()
@@ -230,7 +317,7 @@ mod tests {
                                                 ))
                                                 .unwrap()
                                                 .clone(),
-                                            kind: RelationKind("relation_kind".to_string()),
+                                            kind: random_relation_kind(&mut rng),
                                         }),
                                         _ => {
                                             panic!()
