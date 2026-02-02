@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anyhow::{Context, Result, anyhow};
 use fancy_regex::Regex;
 use serde::{Deserialize, Serialize};
-use trove::{Chest, ChestConfig, Object, ObjectId};
+use trove::{Chest, ChestConfig, Object, ObjectId, PathSegment, path_segments};
 
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode)]
 pub struct Mention {
@@ -243,8 +243,8 @@ impl WriteTransaction<'_, '_, '_, '_> {
             ))
         } else {
             if let Content::Relation(Relation {
-                from: _,
-                to: _,
+                from: ref from_id,
+                to: ref to_id,
                 kind: ref relation_kind,
             }) = thesis.content
             {
@@ -257,6 +257,17 @@ impl WriteTransaction<'_, '_, '_, '_> {
                         "Can not insert relation {thesis:?} of kind {relation_kind:?} in sweater with supported relations kinds {:?} as it's kind is not supported",
                         self.sweater_config.supported_relations_kinds
                     ));
+                }
+                for related_id in [from_id, to_id] {
+                    if self
+                        .chest_transaction
+                        .get(&related_id, path_segments!("content"))?
+                        .is_none()
+                    {
+                        return Err(anyhow!(
+                            "Can not insert relation {thesis:?} in sweater without inserted thesis with {related_id:?}"
+                        ));
+                    }
                 }
             }
             self.chest_transaction.insert_with_id(Object {
