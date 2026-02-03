@@ -31,7 +31,7 @@ static TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 impl Text {
     pub fn validate(&self) -> Result<()> {
         let sentence_regex = TEXT_REGEX.get_or_init(|| {
-            Regex::new(r#"[\p{Script=Latin}\p{Script=Cyrillic}\s\p{P}]+"#)
+            Regex::new(r#"(:?^[\p{Script=Cyrillic}\s,-]+)|(:?[\p{Script=Latin}\s,-]+)$"#)
                 .with_context(|| "Can not compile regular expression for text validation")
                 .unwrap()
         });
@@ -39,7 +39,8 @@ impl Text {
             Ok(())
         } else {
             Err(anyhow!(
-                "Text must be one English or Russian sentence with no punctuation at the end"
+                "Text must be one English or Russian sentence: letters, whitespaces, ',' and '-', so {:?} does not seem to be text",
+                self.0
             ))
         }
     }
@@ -53,7 +54,7 @@ static RELATION_KIND_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::ne
 impl RelationKind {
     pub fn validate(&self) -> Result<()> {
         let sentence_regex = RELATION_KIND_REGEX.get_or_init(|| {
-            Regex::new(r"[\w\s]+")
+            Regex::new(r"^[\w\s]+$")
                 .with_context(|| "Can not compile regular expression for relation kind validation")
                 .unwrap()
         });
@@ -61,7 +62,8 @@ impl RelationKind {
             Ok(())
         } else {
             Err(anyhow!(
-                "Relation kind must be an English words sequence without punctuation"
+                "Relation kind must be an English words sequence without punctuation, so {:?} does not seem to be relation kind",
+                self.0
             ))
         }
     }
@@ -116,7 +118,10 @@ impl Tag {
         if tag_regex.is_match(&self.0) {
             Ok(())
         } else {
-            Err(anyhow!("Tag must be a word symbols sequence"))
+            Err(anyhow!(
+                "Tag must be a word symbols sequence, so {:?} does not seem to be tag",
+                self.0
+            ))
         }
     }
 }
@@ -296,15 +301,28 @@ mod tests {
     }
 
     fn random_text(rng: &mut WyRand) -> Text {
-        const LETTERS: &str = "abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
+        const ENGLISH_LETTERS: [&str; 26] = [
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        ];
+        const RUSSIAN_LETTERS: [&str; 33] = [
+            "а", "б", "в", "г", "д", "е", "ё", "ж", "з", "и", "й", "к", "л", "м", "н", "о", "п",
+            "р", "с", "т", "у", "ф", "х", "ц", "ч", "ш", "щ", "ъ", "ы", "ь", "э", "ю", "я",
+        ];
         const PUNCTUATION: &[&str] = &[", "];
+        let language = rng.generate_range(1..=2);
         let word_count = rng.generate_range(3..=10);
-        let letters: Vec<char> = LETTERS.chars().collect();
         let words: Vec<String> = (0..word_count)
             .map(|_| {
                 let len = rng.generate_range(2..=8);
                 (0..len)
-                    .map(|_| letters[rng.generate_range(0..letters.len())])
+                    .map(|_| {
+                        if language == 1 {
+                            ENGLISH_LETTERS[rng.generate_range(0..ENGLISH_LETTERS.len())]
+                        } else {
+                            RUSSIAN_LETTERS[rng.generate_range(0..RUSSIAN_LETTERS.len())]
+                        }
+                    })
                     .collect()
             })
             .collect();
