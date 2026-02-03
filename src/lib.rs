@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Context, Result, anyhow};
+use fallible_iterator::FallibleIterator;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use trove::{Chest, ChestConfig, Object, ObjectId, PathSegment, path_segments};
+use trove::{Chest, ChestConfig, IndexRecordType, Object, ObjectId, PathSegment, path_segments};
 
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode)]
 pub struct Mention {
@@ -88,6 +89,8 @@ pub enum Content {
     Relation(Relation),
 }
 
+static MENTION_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
 impl Content {
     pub fn id(&self) -> Result<ObjectId> {
         Ok(ObjectId {
@@ -145,6 +148,30 @@ impl Thesis {
             tag.validate()?;
         }
         Ok(())
+    }
+
+    pub fn mentions(&self) -> Result<Vec<Mention>> {
+        match self.content {
+            Content::Text(Text(ref text)) => {
+                let mention_regex = MENTION_REGEX.get_or_init(|| {
+            Regex::new(
+                r"@((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4}))[ ,$]",
+            )
+            .with_context(|| "Can not compile regular expression to search text for mentions")
+            .unwrap()
+        });
+                let self_id = self.id()?;
+                let mut result = vec![];
+                for capture in mention_regex.captures_iter(text) {
+                    result.push(Mention {
+                        mentioned: serde_json::from_str(&format!("\"{}\"", &capture[1]))?,
+                        inside: self_id.clone(),
+                    });
+                }
+                Ok(result)
+            }
+            Content::Relation(_) => Ok(vec![]),
+        }
     }
 }
 
@@ -268,8 +295,14 @@ impl WriteTransaction<'_, '_, '_, '_> {
             }
             self.chest_transaction.insert_with_id(Object {
                 id: thesis_id,
-                value: serde_json::to_value(thesis)?,
+                value: serde_json::to_value(thesis.clone())?,
             })?;
+            for mention in thesis.mentions()? {
+                self.chest_transaction.insert_with_id(Object {
+                    id: mention.id()?,
+                    value: serde_json::to_value(mention)?,
+                })?;
+            }
             Ok(())
         }
     }
@@ -287,6 +320,20 @@ impl WriteTransaction<'_, '_, '_, '_> {
             )?;
         }
         Ok(())
+    }
+
+    pub fn where_mentioned(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
+        self.chest_transaction
+            .select(
+                &vec![(
+                    IndexRecordType::Direct,
+                    path_segments!("mentioned").clone(),
+                    serde_json::to_value(thesis_id)?.try_into()?,
+                )],
+                &vec![],
+                None,
+            )?
+            .collect()
     }
 }
 
@@ -440,14 +487,20 @@ mod tests {
                             };
                             thesis.validate().unwrap();
                             transaction.insert_thesis(thesis.clone()).unwrap();
+                            let thesis_id = thesis.id().unwrap();
                             assert_eq!(
-                                transaction
-                                    .get_thesis(&thesis.id().unwrap())
-                                    .unwrap()
-                                    .unwrap(),
+                                transaction.get_thesis(&thesis_id).unwrap().unwrap(),
                                 thesis
                             );
-                            previously_added_theses.insert(thesis.id().unwrap(), thesis);
+                            assert_eq!(
+                                transaction.where_mentioned(&thesis_id)?,
+                                thesis
+                                    .mentions()?
+                                    .iter()
+                                    .map(|mention| mention.mentioned.clone())
+                                    .collect::<Vec<_>>()
+                            );
+                            previously_added_theses.insert(thesis_id, thesis);
                         }
                         2 => {
                             let tag_to_add = random_tag(&mut rng);
