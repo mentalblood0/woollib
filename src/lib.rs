@@ -220,7 +220,7 @@ macro_rules! define_read_methods {
     () => {
         pub fn get_thesis(&self, thesis_id: &ObjectId) -> Result<Option<Thesis>> {
             if let Some(thesis_json_value) = self.chest_transaction.get(thesis_id, &vec![])? {
-                Ok(serde_json::from_value(thesis_json_value)?)
+                Ok(Some(serde_json::from_value(thesis_json_value).unwrap()))
             } else {
                 Ok(None)
             }
@@ -273,6 +273,21 @@ impl WriteTransaction<'_, '_, '_, '_> {
             Ok(())
         }
     }
+
+    pub fn tag_thesis(&mut self, thesis_id: &ObjectId, tag: Tag) -> Result<()> {
+        if !self.chest_transaction.contains_element(
+            thesis_id,
+            path_segments!("content", "tags"),
+            &serde_json::to_value(tag.clone())?.try_into()?,
+        )? {
+            self.chest_transaction.push(
+                thesis_id,
+                path_segments!("tags"),
+                serde_json::to_value(tag)?,
+            )?;
+        }
+        Ok(())
+    }
 }
 
 impl ReadTransaction<'_> {
@@ -314,8 +329,7 @@ mod tests {
         let word_count = rng.generate_range(3..=10);
         let words: Vec<String> = (0..word_count)
             .map(|_| {
-                let len = rng.generate_range(2..=8);
-                (0..len)
+                (0..rng.generate_range(2..=8))
                     .map(|_| {
                         if language == 1 {
                             ENGLISH_LETTERS[rng.generate_range(0..ENGLISH_LETTERS.len())]
@@ -340,6 +354,60 @@ mod tests {
         Text(result)
     }
 
+    fn random_tag(rng: &mut WyRand) -> Tag {
+        const LETTERS: [&str; 26] = [
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        ];
+        Tag((0..rng.generate_range(2..=8))
+            .map(|_| LETTERS[rng.generate_range(0..LETTERS.len())])
+            .collect())
+    }
+
+    fn random_thesis(
+        rng: &mut WyRand,
+        previously_added_theses: &BTreeMap<ObjectId, Thesis>,
+        transaction: &WriteTransaction,
+    ) -> Thesis {
+        Thesis {
+            content: {
+                let action_id = if previously_added_theses.is_empty() {
+                    1
+                } else {
+                    rng.generate_range(1..=2)
+                };
+                match action_id {
+                    1 => Content::Text(random_text(rng)),
+                    2 => Content::Relation(Relation {
+                        from: previously_added_theses
+                            .keys()
+                            .nth(rng.generate_range(0..previously_added_theses.len()))
+                            .unwrap()
+                            .clone(),
+                        to: previously_added_theses
+                            .keys()
+                            .nth(rng.generate_range(0..previously_added_theses.len()))
+                            .unwrap()
+                            .clone(),
+                        kind: transaction
+                            .sweater_config
+                            .supported_relations_kinds
+                            .iter()
+                            .nth(rng.generate_range(
+                                0..transaction.sweater_config.supported_relations_kinds.len(),
+                            ))
+                            .unwrap()
+                            .clone(),
+                    }),
+                    _ => {
+                        panic!()
+                    }
+                }
+            },
+            tags: vec![],
+        }
+    }
+
     #[test]
     fn test_generative() {
         let mut sweater = new_default_sweater("test_generative");
@@ -354,55 +422,21 @@ mod tests {
                     let action_id = if previously_added_theses.is_empty() {
                         1
                     } else {
-                        rng.generate_range(1..=3)
+                        rng.generate_range(1..=2)
                     };
                     match action_id {
                         1 => {
-                            let thesis = Thesis {
-                                content: {
-                                    let action_id = if previously_added_theses.is_empty() {
-                                        1
-                                    } else {
-                                        rng.generate_range(1..=2)
-                                    };
-                                    match action_id {
-                                        1 => Content::Text(random_text(&mut rng)),
-                                        2 => Content::Relation(Relation {
-                                            from: previously_added_theses
-                                                .keys()
-                                                .nth(rng.generate_range(
-                                                    0..previously_added_theses.len(),
-                                                ))
-                                                .unwrap()
-                                                .clone(),
-                                            to: previously_added_theses
-                                                .keys()
-                                                .nth(rng.generate_range(
-                                                    0..previously_added_theses.len(),
-                                                ))
-                                                .unwrap()
-                                                .clone(),
-                                            kind: transaction
-                                                .sweater_config
-                                                .supported_relations_kinds
-                                                .iter()
-                                                .nth(
-                                                    rng.generate_range(
-                                                        0..transaction
-                                                            .sweater_config
-                                                            .supported_relations_kinds
-                                                            .len(),
-                                                    ),
-                                                )
-                                                .unwrap()
-                                                .clone(),
-                                        }),
-                                        _ => {
-                                            panic!()
-                                        }
-                                    }
-                                },
-                                tags: vec![],
+                            let thesis = {
+                                let mut result =
+                                    random_thesis(&mut rng, &previously_added_theses, &transaction);
+                                while previously_added_theses.contains_key(&result.id().unwrap()) {
+                                    result = random_thesis(
+                                        &mut rng,
+                                        &previously_added_theses,
+                                        &transaction,
+                                    );
+                                }
+                                result
                             };
                             thesis.validate().unwrap();
                             transaction.insert_thesis(thesis.clone()).unwrap();
@@ -414,6 +448,30 @@ mod tests {
                                 thesis
                             );
                             previously_added_theses.insert(thesis.id().unwrap(), thesis);
+                        }
+                        2 => {
+                            let tag_to_add = random_tag(&mut rng);
+                            let thesis_to_tag_id = previously_added_theses
+                                .keys()
+                                .nth(rng.generate_range(0..previously_added_theses.len()))
+                                .unwrap()
+                                .clone();
+                            transaction
+                                .tag_thesis(&thesis_to_tag_id, tag_to_add.clone())
+                                .unwrap();
+                            assert!(
+                                transaction
+                                    .get_thesis(&thesis_to_tag_id)
+                                    .unwrap()
+                                    .unwrap()
+                                    .tags
+                                    .contains(&tag_to_add)
+                            );
+                            previously_added_theses
+                                .get_mut(&thesis_to_tag_id)
+                                .unwrap()
+                                .tags
+                                .push(tag_to_add);
                         }
                         _ => {}
                     }
