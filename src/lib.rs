@@ -261,9 +261,6 @@ impl WriteTransaction<'_, '_, '_, '_> {
     define_read_methods!();
 
     pub fn where_mentioned(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
-        for object in self.chest_transaction.objects()?.iterator() {
-            println!("object {object:?}");
-        }
         self.chest_transaction
             .select(
                 &vec![(
@@ -329,7 +326,6 @@ impl WriteTransaction<'_, '_, '_, '_> {
                 value: serde_json::to_value(thesis.clone())?,
             })?;
             for mention in thesis.mentions()? {
-                println!("insert {mention:?}");
                 self.chest_transaction.insert_with_id(Object {
                     id: mention.id()?,
                     value: serde_json::to_value(mention)?,
@@ -524,14 +520,13 @@ mod tests {
                                 transaction.get_thesis(&thesis_id).unwrap().unwrap(),
                                 thesis
                             );
-                            assert_eq!(
-                                transaction.where_mentioned(&thesis_id)?,
-                                thesis
-                                    .mentions()?
-                                    .into_iter()
-                                    .map(|mention| mention.mentioned)
-                                    .collect::<Vec<_>>()
-                            );
+                            for mention in thesis.mentions()? {
+                                assert!(
+                                    transaction
+                                        .where_mentioned(&mention.mentioned)?
+                                        .contains(&thesis_id)
+                                );
+                            }
                             previously_added_theses.insert(thesis_id, thesis);
                         }
                         2 => {
