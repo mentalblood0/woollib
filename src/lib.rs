@@ -258,6 +258,32 @@ macro_rules! define_read_methods {
 impl WriteTransaction<'_, '_, '_, '_> {
     define_read_methods!();
 
+    pub fn where_mentioned(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
+        self.chest_transaction
+            .select(
+                &vec![(
+                    IndexRecordType::Direct,
+                    path_segments!("mentioned"),
+                    serde_json::to_value(thesis_id)?.try_into()?,
+                )],
+                &vec![],
+                None,
+            )?
+            .map(|mention_id| {
+                Ok(serde_json::from_value(
+                    self.chest_transaction
+                        .get(&mention_id, &path_segments!("inside"))?
+                        .with_context(|| {
+                            format!(
+                                "Can not get field 'inside' of mention with {:?}",
+                                mention_id
+                            )
+                        })?,
+                )?)
+            })
+            .collect()
+    }
+
     pub fn insert_thesis(&mut self, thesis: Thesis) -> Result<()> {
         let thesis_id = thesis.id()?;
         if self.chest_transaction.contains_object_with_id(&thesis_id)? {
@@ -321,20 +347,6 @@ impl WriteTransaction<'_, '_, '_, '_> {
         }
         Ok(())
     }
-
-    pub fn where_mentioned(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
-        self.chest_transaction
-            .select(
-                &vec![(
-                    IndexRecordType::Direct,
-                    path_segments!("mentioned"),
-                    serde_json::to_value(thesis_id)?.try_into()?,
-                )],
-                &vec![],
-                None,
-            )?
-            .collect()
-    }
 }
 
 impl ReadTransaction<'_> {
@@ -362,7 +374,7 @@ mod tests {
         .unwrap()
     }
 
-    fn random_text(rng: &mut WyRand) -> Text {
+    fn random_text(rng: &mut WyRand, previously_added_theses: &BTreeMap<ObjectId, Thesis>) -> Text {
         const ENGLISH_LETTERS: [&str; 26] = [
             "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
             "r", "s", "t", "u", "v", "w", "x", "y", "z",
@@ -373,18 +385,34 @@ mod tests {
         ];
         const PUNCTUATION: &[&str] = &[", "];
         let language = rng.generate_range(1..=2);
-        let word_count = rng.generate_range(3..=10);
-        let words: Vec<String> = (0..word_count)
+        let words: Vec<String> = (0..rng.generate_range(3..=10))
             .map(|_| {
-                (0..rng.generate_range(2..=8))
-                    .map(|_| {
-                        if language == 1 {
-                            ENGLISH_LETTERS[rng.generate_range(0..ENGLISH_LETTERS.len())]
-                        } else {
-                            RUSSIAN_LETTERS[rng.generate_range(0..RUSSIAN_LETTERS.len())]
-                        }
-                    })
-                    .collect()
+                if previously_added_theses.is_empty() || rng.generate_range(0..=1) == 0 {
+                    (0..rng.generate_range(2..=8))
+                        .map(|_| {
+                            if language == 1 {
+                                ENGLISH_LETTERS[rng.generate_range(0..ENGLISH_LETTERS.len())]
+                            } else {
+                                RUSSIAN_LETTERS[rng.generate_range(0..RUSSIAN_LETTERS.len())]
+                            }
+                        })
+                        .collect()
+                } else {
+                    format!(
+                        "@{}",
+                        serde_json::to_value(
+                            previously_added_theses
+                                .keys()
+                                .nth(rng.generate_range(0..previously_added_theses.len()))
+                                .unwrap()
+                                .clone(),
+                        )
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string()
+                    )
+                }
             })
             .collect();
         let mut result = String::new();
@@ -424,7 +452,7 @@ mod tests {
                     rng.generate_range(1..=2)
                 };
                 match action_id {
-                    1 => Content::Text(random_text(rng)),
+                    1 => Content::Text(random_text(rng, previously_added_theses)),
                     2 => Content::Relation(Relation {
                         from: previously_added_theses
                             .keys()
@@ -459,8 +487,6 @@ mod tests {
     fn test_generative() {
         let mut sweater = new_default_sweater("test_generative");
         let mut rng = WyRand::new_seed(0);
-
-        random_text(&mut rng).validate().unwrap();
 
         sweater
             .lock_all_and_write(|transaction| {
