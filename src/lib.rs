@@ -32,7 +32,7 @@ static TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 impl Text {
     pub fn validate(&self) -> Result<()> {
         let sentence_regex = TEXT_REGEX.get_or_init(|| {
-            Regex::new(r#"(:?^[\p{Script=Cyrillic}\s,-]+)|(:?[\p{Script=Latin}\s,-]+)$"#)
+            Regex::new(r#"^(?:[\p{Script=Cyrillic}\s,-]+|@[A-Za-z0-9-_]{22})+(?:\s+(?:[\p{Script=Cyrillic}\s,-]+|@[A-Za-z0-9-_]{22})+)*$|^(?:[\p{Script=Latin}\s,-]+|@[A-Za-z0-9-_]{22})+(?:\s+(?:[\p{Script=Latin}\s,-]+|@[A-Za-z0-9-_]{22})+)*$"#)
                 .with_context(|| "Can not compile regular expression for text validation")
                 .unwrap()
         });
@@ -89,8 +89,6 @@ pub enum Content {
     Relation(Relation),
 }
 
-static MENTION_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-
 impl Content {
     pub fn id(&self) -> Result<ObjectId> {
         Ok(ObjectId {
@@ -136,6 +134,8 @@ pub struct Thesis {
     #[serde(default)]
     pub tags: Vec<Tag>,
 }
+
+static MENTION_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 
 impl Thesis {
     pub fn id(&self) -> Result<ObjectId> {
