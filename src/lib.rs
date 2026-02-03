@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Context, Result, anyhow};
-use fancy_regex::Regex;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use trove::{Chest, ChestConfig, Object, ObjectId, PathSegment, path_segments};
 
@@ -31,14 +31,11 @@ static TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 impl Text {
     pub fn validate(&self) -> Result<()> {
         let sentence_regex = TEXT_REGEX.get_or_init(|| {
-            Regex::new(r#"^(?=.*[a-zA-Zа-яА-ЯёЁ])[a-zA-Zа-яА-ЯёЁ\s,'"\-]+$"#)
+            Regex::new(r#"[\p{Script=Latin}\p{Script=Cyrillic}\s\p{P}]+"#)
                 .with_context(|| "Can not compile regular expression for text validation")
                 .unwrap()
         });
-        if sentence_regex
-            .is_match(&self.0)
-            .with_context(|| "Regex matching failed")?
-        {
+        if sentence_regex.is_match(&self.0) {
             Ok(())
         } else {
             Err(anyhow!(
@@ -56,14 +53,11 @@ static RELATION_KIND_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::ne
 impl RelationKind {
     pub fn validate(&self) -> Result<()> {
         let sentence_regex = RELATION_KIND_REGEX.get_or_init(|| {
-            Regex::new(r"^(?=.*[a-zA-Z])[a-zA-Z\s]+$")
+            Regex::new(r"[\w\s]+")
                 .with_context(|| "Can not compile regular expression for relation kind validation")
                 .unwrap()
         });
-        if sentence_regex
-            .is_match(&self.0)
-            .with_context(|| "Regex matching failed")?
-        {
+        if sentence_regex.is_match(&self.0) {
             Ok(())
         } else {
             Err(anyhow!(
@@ -119,10 +113,7 @@ impl Tag {
                 .with_context(|| "Can not compile regular expression for tag validation")
                 .unwrap()
         });
-        if tag_regex
-            .is_match(&self.0)
-            .with_context(|| "Regex matching failed")?
-        {
+        if tag_regex.is_match(&self.0) {
             Ok(())
         } else {
             Err(anyhow!("Tag must be a word symbols sequence"))
