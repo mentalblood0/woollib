@@ -350,7 +350,7 @@ mod tests {
         sweater
             .lock_all_and_write(|transaction| {
                 let mut previously_added_theses: BTreeMap<ObjectId, Thesis> = BTreeMap::new();
-                for _ in 0..100 {
+                for _ in 0..1000 {
                     let action_id = if previously_added_theses.is_empty() {
                         1
                     } else {
@@ -406,13 +406,20 @@ mod tests {
                             };
                             thesis.validate().unwrap();
                             transaction.insert_thesis(thesis.clone()).unwrap();
+                            assert_eq!(
+                                transaction
+                                    .get_thesis(&thesis.id().unwrap())
+                                    .unwrap()
+                                    .unwrap(),
+                                thesis
+                            );
                             previously_added_theses.insert(thesis.id().unwrap(), thesis);
                         }
                         _ => {}
                     }
-                    for (thesis_id, thesis) in previously_added_theses.iter() {
-                        assert_eq!(transaction.get_thesis(thesis_id).unwrap().unwrap(), *thesis);
-                    }
+                }
+                for (thesis_id, thesis) in previously_added_theses.iter() {
+                    assert_eq!(transaction.get_thesis(thesis_id).unwrap().unwrap(), *thesis);
                 }
                 Ok(())
             })
