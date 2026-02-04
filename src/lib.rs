@@ -350,6 +350,18 @@ impl WriteTransaction<'_, '_, '_, '_> {
         Ok(())
     }
 
+    pub fn untag_thesis(&mut self, thesis_id: &ObjectId, tag: &Tag) -> Result<()> {
+        if let Some(tag_index_in_array) = self.chest_transaction.get_element_index(
+            thesis_id,
+            &path_segments!("tags"),
+            &serde_json::to_value(tag)?.try_into()?,
+        )? {
+            self.chest_transaction
+                .remove(thesis_id, &path_segments!("tags", tag_index_in_array))?;
+        }
+        Ok(())
+    }
+
     pub fn remove_thesis(&mut self, thesis_id: &ObjectId) -> Result<()> {
         if self.chest_transaction.contains_object_with_id(thesis_id)? {
             self.chest_transaction.remove(thesis_id, &vec![])?;
@@ -533,7 +545,7 @@ mod tests {
                     let action_id = if previously_added_theses.is_empty() {
                         1
                     } else {
-                        rng.generate_range(1..=2)
+                        rng.generate_range(1..=3)
                     };
                     match action_id {
                         1 => {
@@ -588,6 +600,35 @@ mod tests {
                                 .unwrap()
                                 .tags
                                 .push(tag_to_add);
+                        }
+                        3 => {
+                            if let Some((thesis_to_untag_id, thesis_to_untag)) =
+                                previously_added_theses
+                                    .iter()
+                                    .find(|(_, thesis)| !thesis.tags.is_empty())
+                                    .map(|(id, thesis)| (id.clone(), thesis.clone()))
+                            {
+                                let tag_to_remove_index =
+                                    rng.generate_range(0..thesis_to_untag.tags.len());
+                                let tag_to_remove =
+                                    thesis_to_untag.tags[tag_to_remove_index].clone();
+                                transaction
+                                    .untag_thesis(&thesis_to_untag_id, &tag_to_remove)
+                                    .unwrap();
+                                assert!(
+                                    !transaction
+                                        .get_thesis(&thesis_to_untag_id)
+                                        .unwrap()
+                                        .unwrap()
+                                        .tags
+                                        .contains(&tag_to_remove)
+                                );
+                                previously_added_theses
+                                    .get_mut(&thesis_to_untag_id)
+                                    .unwrap()
+                                    .tags
+                                    .remove(tag_to_remove_index);
+                            }
                         }
                         _ => {}
                     }
