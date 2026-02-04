@@ -351,9 +351,8 @@ impl WriteTransaction<'_, '_, '_, '_> {
     }
 
     pub fn remove_thesis(&mut self, thesis_id: &ObjectId) -> Result<()> {
-        if let Some(thesis_json_value) = self.chest_transaction.get(thesis_id, &vec![])? {
+        if self.chest_transaction.contains_object_with_id(thesis_id)? {
             self.chest_transaction.remove(thesis_id, &vec![])?;
-            let thesis = serde_json::from_value::<Thesis>(thesis_json_value)?;
             let thesis_id_json_value = serde_json::to_value(thesis_id)?;
             let relations_ids = self
                 .chest_transaction
@@ -376,11 +375,12 @@ impl WriteTransaction<'_, '_, '_, '_> {
                     None,
                 )?)
                 .collect::<Vec<_>>()?;
-            for related_id in relations_ids {
-                self.chest_transaction.remove(&related_id, &vec![])?;
+            for relation_id in relations_ids {
+                self.chest_transaction.remove(&relation_id, &vec![])?;
             }
-            for mention in thesis.mentions()? {
-                self.remove_thesis(&mention.mentioned)?;
+            let where_mentioned = self.where_mentioned(thesis_id)?;
+            for id_of_thesis_where_mentioned in where_mentioned {
+                self.remove_thesis(&id_of_thesis_where_mentioned)?;
             }
         }
         Ok(())
