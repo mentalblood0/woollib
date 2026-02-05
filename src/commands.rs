@@ -1,8 +1,13 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use trove::ObjectId;
+
+use super::relation::RelationKind;
+use super::tag::Tag;
+use super::text::Text;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Alias(String);
@@ -80,12 +85,12 @@ pub fn parse_commands_batch(
     input: &str,
     supported_relations_kinds: &BTreeSet<RelationKind>,
 ) -> Result<Vec<Command>> {
-    let commands_split_regex = TEXT_REGEX.get_or_init(|| {
+    let commands_split_regex = COMMANDS_SPLIT_REGEX.get_or_init(|| {
         Regex::new(r#"(\r?\n|\r){2,}"#)
             .with_context(|| "Can not compile regular expression for commands splitting")
             .unwrap()
     });
-    let command_first_line_regex = TEXT_REGEX.get_or_init(|| {
+    let command_first_line_regex = COMMAND_FIRST_LINE_REGEX.get_or_init(|| {
         Regex::new(r#"^ *(\+|-|#|\^) +([^ ]+) *$"#)
             .with_context(|| "Can not compile regular expression for commands splitting")
             .unwrap()
