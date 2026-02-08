@@ -3,13 +3,15 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use trove::ObjectId;
 
-use super::content::Content;
-use super::mention::Mention;
-use super::tag::Tag;
-use super::text::Text;
+use crate::alias::Alias;
+use crate::content::Content;
+use crate::mention::Mention;
+use crate::tag::Tag;
+use crate::text::Text;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Thesis {
+    pub alias: Option<Alias>,
     pub content: Content,
 
     #[serde(default)]
@@ -22,6 +24,9 @@ impl Thesis {
     }
 
     pub fn validated(&self) -> Result<&Self> {
+        if let Some(ref alias) = self.alias {
+            alias.validated()?;
+        }
         self.content.validated()?;
         for tag in self.tags.iter() {
             tag.validated()?;

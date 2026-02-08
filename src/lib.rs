@@ -1,13 +1,14 @@
-mod commands;
-mod content;
-mod mention;
-mod read_transaction;
-mod relation;
-mod sweater;
-mod tag;
-mod text;
-mod thesis;
-mod write_transaction;
+pub mod alias;
+pub mod commands;
+pub mod content;
+pub mod mention;
+pub mod read_transaction;
+pub mod relation;
+pub mod sweater;
+pub mod tag;
+pub mod text;
+pub mod thesis;
+pub mod write_transaction;
 
 use trove::PathSegment;
 
@@ -110,6 +111,7 @@ mod tests {
         transaction: &WriteTransaction,
     ) -> Thesis {
         Thesis {
+            alias: None,
             content: {
                 let action_id = if previously_added_theses.is_empty() {
                     1
