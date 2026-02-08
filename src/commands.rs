@@ -7,7 +7,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use trove::ObjectId;
 
-use crate::relation::RelationKind;
+use crate::content::Content;
+use crate::relation::{Relation, RelationKind};
 use crate::tag::Tag;
 use crate::text::Text;
 
@@ -136,7 +137,7 @@ static COMMAND_FIRST_LINE_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLoc
 struct CommandsIterator<'a> {
     paragraphs_iterator: Box<dyn FallibleIterator<Item = (usize, &'a str), Error = Error> + 'a>,
     supported_relations_kinds: &'a BTreeSet<RelationKind>,
-    aliases: BTreeSet<Alias>,
+    aliases: BTreeMap<Alias, ObjectId>,
 }
 
 impl<'a> CommandsIterator<'a> {
@@ -156,7 +157,14 @@ impl<'a> CommandsIterator<'a> {
                     .map(|index_and_paragraph| Ok(index_and_paragraph)),
             )),
             supported_relations_kinds,
-            aliases: BTreeSet::new(),
+            aliases: BTreeMap::new(),
+        }
+    }
+
+    fn get_thesis_id(&self, thesis_reference: &ThesisReference) -> Option<ObjectId> {
+        match thesis_reference {
+            ThesisReference::Alias(alias) => self.aliases.get(&alias).cloned(),
+            ThesisReference::ObjectId(object_id) => Some(object_id.clone()),
         }
     }
 }
@@ -190,24 +198,33 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                 }
                 Ok(Some(match (operation_char, lines.len()) {
                     ('+', 2) => {
-                        if let Some(ref alias) = alias_option {
-                            self.aliases.insert(alias.clone());
-                        }
-                        Command::AddTextThesis(AddTextThesis {
-                            alias: alias_option,
+                        let add_text_thesis = AddTextThesis {
+                            alias: alias_option.clone(),
                             text: Text(lines[1].to_string()),
-                        })
+                        };
+                        if let Some(ref alias) = alias_option {
+                            self.aliases.insert(alias.clone(), Content::Text(add_text_thesis.text.clone()).id()?);
+                        }
+                        Command::AddTextThesis(add_text_thesis)
                     }
                     ('+', 4) => {
-                        if let Some(ref alias) = alias_option {
-                            self.aliases.insert(alias.clone());
-                        }
-                        Command::AddRelationThesis(AddRelationThesis {
-                            alias: alias_option,
+                        let add_relation_thesis = AddRelationThesis {
+                            alias: alias_option.clone(),
                             from: ThesisReference::new(lines[1])?,
                             kind: RelationKind(lines[2].to_string()),
                             to: ThesisReference::new(lines[3])?,
-                        })
+                        };
+                        if let Some(ref alias) = alias_option {
+                            self.aliases.insert(
+                                alias.clone(), 
+                                Content::Relation(Relation {
+                                    from: self.get_thesis_id(&add_relation_thesis.from).ok_or_else(|| anyhow!("Can not parse {}-th paragraph {:?}: no known thesis referenced by {:?}", paragraph_index + 1, paragraph, add_relation_thesis.from))?,
+                                    to: self.get_thesis_id(&add_relation_thesis.to).ok_or_else(|| anyhow!("Can not parse {}-th paragraph {:?}: no known thesis referenced by {:?}", paragraph_index + 1, paragraph, add_relation_thesis.from))?,
+                                    kind: add_relation_thesis.kind.clone() }
+                                ).id()?
+                            );
+                        }
+                        Command::AddRelationThesis(add_relation_thesis)
                     }
                     ('-', 2) => Command::RemoveThesis(RemoveThesis {
                         thesis_id: serde_json::from_str(&format!("\"{}\"", lines[1]))?,
@@ -222,7 +239,7 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                     }),
                     _ => {
                         return Err(anyhow!(
-                            "Unsupported operation character and lines count combination ({:?}, {}) in first line {:?} of {}-nth paragraph {:?}, supported combinations are ('+', 2) for adding text thesis, ('+', 4) for adding relation thesis, ('-', 2) for removing thesis, ('#', 3) for adding tag, ('^', 3) for removing tag",
+                            "Unsupported operation character and lines count combination ({:?}, {}) in first line {:?} of {}-th paragraph {:?}, supported combinations are ('+', 2) for adding text thesis, ('+', 4) for adding relation thesis, ('-', 2) for removing thesis, ('#', 3) for adding tag, ('^', 3) for removing tag",
                             operation_char,
                             lines.len(),
                             lines[0],
@@ -230,10 +247,10 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                             paragraph
                         ));
                     }
-                }.validated()?.to_owned()))
+                }.validated().with_context(|| format!("Invalid command parsed from {}-th paragraph {:?}", paragraph_index + 1, paragraph))?.to_owned()))
             } else {
                 Err(anyhow!(
-                    "Can not parse first line {:?} in {}-nth paragraph {:?}",
+                    "Can not parse first line {:?} in {}-th paragraph {:?}",
                     lines[0],
                     paragraph_index + 1,
                     paragraph
