@@ -3,6 +3,7 @@ pub mod commands;
 pub mod content;
 pub mod mention;
 pub mod read_transaction;
+pub mod reference;
 pub mod relation;
 pub mod sweater;
 pub mod tag;

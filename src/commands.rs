@@ -12,35 +12,8 @@ use crate::relation::{Relation, RelationKind};
 use crate::tag::Tag;
 use crate::text::Text;
 use crate::alias::Alias;
+use crate::reference::Reference;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ThesisReference {
-    Alias(Alias),
-    ObjectId(ObjectId),
-}
-
-impl ThesisReference {
-    pub fn new(input: &str) -> Result<Self> {
-        if let Ok(alias) = Alias(input.to_string()).validated() {
-            Ok(Self::Alias(alias.to_owned()))
-        } else {
-            Ok(Self::ObjectId(serde_json::from_str(&format!(
-                "\"{}\"",
-                input
-            ))?))
-        }
-    }
-
-    pub fn validated(&self) -> Result<&Self> {
-        match self {
-            ThesisReference::Alias(alias) => {
-                alias.validated()?;
-            }
-            ThesisReference::ObjectId(_) => {}
-        }
-        Ok(self)
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AddTextThesis {
@@ -51,8 +24,8 @@ pub struct AddTextThesis {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AddRelationThesis {
     pub alias: Option<Alias>,
-    pub from: ThesisReference,
-    pub to: ThesisReference,
+    pub from: Reference,
+    pub to: Reference,
     pub kind: RelationKind,
 }
 
@@ -63,7 +36,7 @@ pub struct RemoveThesis {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AddTag {
-    pub thesis_reference: ThesisReference,
+    pub reference: Reference,
     pub tag: Tag,
 }
 
@@ -99,7 +72,7 @@ impl Command {
             }
             Command::RemoveThesis(_) => {}
             Command::AddTag(add_tag) => {
-                add_tag.thesis_reference.validated()?;
+                add_tag.reference.validated()?;
                 add_tag.tag.validated()?;
             }
             Command::RemoveTag(remove_tag) => {
@@ -209,7 +182,7 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                         thesis_id: serde_json::from_str(&format!("\"{}\"", lines[1]))?,
                     }),
                     ('#', 3) => Command::AddTag(AddTag {
-                        thesis_reference: ThesisReference::new(lines[1])?,
+                        reference: ThesisReference::new(lines[1])?,
                         tag: Tag(lines[2].to_string()),
                     }),
                     ('^', 3) => Command::RemoveTag(RemoveTag {
