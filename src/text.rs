@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use trove::ObjectId;
 
 use crate::alias::Alias;
-use crate::reference::Reference;
+use crate::read_transaction::ReadTransactionMethods;
 
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
 pub struct RawText(pub String);
@@ -29,13 +29,16 @@ impl RawText {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct TextWithAliases {
+pub struct Text {
     pub raw_text_parts: Vec<RawText>,
-    pub references: Vec<Reference>,
+    pub references: Vec<ObjectId>,
 }
 
-impl TextWithAliases {
-    pub fn new(input: &str) -> Result<Self> {
+impl Text {
+    pub fn new(
+        input: &str,
+        transaction_for_aliases_resolving: &impl ReadTransactionMethods,
+    ) -> Result<Self> {
         static REFERENCE_IN_TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
         let reference_in_text_regex = REFERENCE_IN_TEXT_REGEX.get_or_init(|| {
             Regex::new(r"[^ ,]@(:?([A-Za-z0-9-_]{22})|(\S+))[ ,$]")
@@ -60,17 +63,15 @@ impl TextWithAliases {
             {
                 result
                     .references
-                    .push(Reference::ObjectId(serde_json::from_str(&format!(
-                        "\"{}\"",
-                        thesis_id_string
-                    ))?));
+                    .push(serde_json::from_str(&format!("\"{}\"", thesis_id_string))?);
             } else if let Some(alias_string) = reference_match
                 .get(2)
                 .map(|alias_string_match| alias_string_match.as_str())
             {
-                result
-                    .references
-                    .push(Reference::Alias(Alias(alias_string.to_string())));
+                result.references.push(
+                    transaction_for_aliases_resolving
+                        .get_thesis_id_by_alias(&Alias(alias_string.to_string()))?.ok_or_else(|| anyhow!("Can not parse text {:?} with alias {:?} because do not know such alias", input, alias_string))?,
+                );
             }
             last_match_end = full_reference_match.end();
         }
@@ -84,21 +85,6 @@ impl TextWithAliases {
         Ok(result)
     }
 
-    pub fn validated(&self) -> Result<&Self> {
-        for part in self.raw_text_parts.iter() {
-            part.validated()?;
-        }
-        Ok(self)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
-pub struct Text {
-    pub raw_text_parts: Vec<RawText>,
-    pub mentions: Vec<ObjectId>,
-}
-
-impl Text {
     pub fn validated(&self) -> Result<&Self> {
         for part in self.raw_text_parts.iter() {
             part.validated()?;

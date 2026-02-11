@@ -21,13 +21,13 @@ mod tests {
     use pretty_assertions::assert_eq;
     use trove::ObjectId;
 
-    use super::content::Content;
-    use super::relation::Relation;
-    use super::sweater::Sweater;
-    use super::tag::Tag;
-    use super::text::Text;
-    use super::thesis::Thesis;
-    use super::write_transaction::WriteTransaction;
+    use crate::content::Content;
+    use crate::relation::Relation;
+    use crate::sweater::Sweater;
+    use crate::tag::Tag;
+    use crate::text::Text;
+    use crate::thesis::Thesis;
+    use crate::write_transaction::WriteTransaction;
 
     fn new_default_sweater(test_name_for_isolation: &str) -> Sweater {
         Sweater::new(

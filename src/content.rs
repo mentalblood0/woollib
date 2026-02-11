@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use trove::ObjectId;
 
-use super::relation::Relation;
-use super::text::Text;
+use crate::relation::Relation;
+use crate::text::Text;
 
 #[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
 pub enum Content {

@@ -2,21 +2,25 @@ use anyhow::{Context, Result, anyhow};
 use fallible_iterator::FallibleIterator;
 use trove::{IndexRecordType, Object, ObjectId, path_segments};
 
-use super::content::Content;
-use super::define_read_methods;
-use super::relation::Relation;
-use super::sweater::SweaterConfig;
-use super::tag::Tag;
-use super::thesis::Thesis;
+use crate::alias::Alias;
+use crate::content::Content;
+use crate::define_read_methods;
+use crate::read_transaction::ReadTransactionMethods;
+use crate::relation::Relation;
+use crate::sweater::SweaterConfig;
+use crate::tag::Tag;
+use crate::thesis::Thesis;
 
 pub struct WriteTransaction<'a, 'b, 'c, 'd> {
     pub chest_transaction: &'a mut trove::WriteTransaction<'b, 'c, 'd>,
     pub sweater_config: SweaterConfig,
 }
 
-impl WriteTransaction<'_, '_, '_, '_> {
+impl ReadTransactionMethods for WriteTransaction<'_, '_, '_, '_> {
     define_read_methods!();
+}
 
+impl WriteTransaction<'_, '_, '_, '_> {
     pub fn where_mentioned(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
         self.chest_transaction
             .select(

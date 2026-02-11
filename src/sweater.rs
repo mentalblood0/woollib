@@ -4,9 +4,9 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use trove::{Chest, ChestConfig};
 
-use super::read_transaction::ReadTransaction;
-use super::relation::RelationKind;
-use super::write_transaction::WriteTransaction;
+use crate::read_transaction::ReadTransaction;
+use crate::relation::RelationKind;
+use crate::write_transaction::WriteTransaction;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SweaterConfig {
