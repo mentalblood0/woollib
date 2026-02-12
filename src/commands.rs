@@ -44,23 +44,23 @@ pub struct RemoveThesis {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct AddTag {
+pub struct AddTags {
     pub thesis_id: ObjectId,
-    pub tag: Tag,
+    pub tags: Vec<Tag>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct RemoveTag {
+pub struct RemoveTags {
     pub thesis_id: ObjectId,
-    pub tag: Tag,
+    pub tags: Vec<Tag>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     AddThesis(AddThesis),
-    AddTag(AddTag),
+    AddTag(AddTags),
     RemoveThesis(RemoveThesis),
-    RemoveTag(RemoveTag),
+    RemoveTag(RemoveTags),
 }
 
 impl Command {
@@ -71,10 +71,14 @@ impl Command {
             }
             Command::RemoveThesis(_) => {}
             Command::AddTag(add_tag) => {
-                add_tag.tag.validated()?;
+                for tag in add_tag.tags.iter() {
+                    tag.validated()?;
+                }
             }
             Command::RemoveTag(remove_tag) => {
-                remove_tag.tag.validated()?;
+                for tag in remove_tag.tags.iter() {
+                    tag.validated()?;
+                }
             }
         }
         Ok(self)
@@ -202,13 +206,13 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                     ('-', 2) => Command::RemoveThesis(RemoveThesis {
                         thesis_id: serde_json::from_str(&format!("\"{}\"", lines[1]))?,
                     }),
-                    ('#', 3) => Command::AddTag(AddTag {
+                    ('#', 3) => Command::AddTag(AddTags {
                         thesis_id: self.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
-                        tag: Tag(lines[2].to_string()),
+                        tags: lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
                     }),
-                    ('^', 3) => Command::RemoveTag(RemoveTag {
+                    ('^', 3) => Command::RemoveTag(RemoveTags {
                         thesis_id: serde_json::from_str(&format!("\"{}\"", lines[1]))?,
-                        tag: Tag(lines[2].to_string()),
+                        tags: lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
                     }),
                     _ => {
                         return Err(anyhow!(
