@@ -192,6 +192,7 @@ mod tests {
                                 transaction.get_thesis(&thesis_id).unwrap().unwrap(),
                                 thesis
                             );
+                            dbg!(&thesis);
                             for referenced_thesis_id in thesis.references() {
                                 let where_referenced =
                                     transaction.where_referenced(&referenced_thesis_id)?;
@@ -203,13 +204,10 @@ mod tests {
                                     .collect::<Vec<_>>()
                                     .unwrap()
                                 {
+                                    // dbg!(object.value);
                                     dbg!(serde_json::from_value::<Thesis>(object.value).unwrap());
                                 }
-                                assert!(
-                                    transaction
-                                        .where_referenced(&referenced_thesis_id)?
-                                        .contains(&thesis_id)
-                                );
+                                assert!(where_referenced.contains(&thesis_id));
                             }
                             previously_added_theses.insert(thesis_id, thesis);
                         }

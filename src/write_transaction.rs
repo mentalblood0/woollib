@@ -22,16 +22,35 @@ impl ReadTransactionMethods for WriteTransaction<'_, '_, '_, '_> {
 
 impl WriteTransaction<'_, '_, '_, '_> {
     pub fn where_referenced(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
+        let json_value = serde_json::to_value(thesis_id)?;
         self.chest_transaction
             .select(
                 &vec![(
-                    IndexRecordType::Direct,
+                    IndexRecordType::Array,
                     path_segments!("content", "Text", "references"),
-                    serde_json::to_value(thesis_id)?,
+                    json_value.clone(),
                 )],
                 &vec![],
                 None,
             )?
+            .chain(self.chest_transaction.select(
+                &vec![(
+                    IndexRecordType::Direct,
+                    path_segments!("content", "Relation", "from"),
+                    json_value.clone(),
+                )],
+                &vec![],
+                None,
+            )?)
+            .chain(self.chest_transaction.select(
+                &vec![(
+                    IndexRecordType::Direct,
+                    path_segments!("content", "Relation", "to"),
+                    json_value,
+                )],
+                &vec![],
+                None,
+            )?)
             .collect()
     }
 
