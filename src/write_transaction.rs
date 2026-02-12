@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use fallible_iterator::FallibleIterator;
 use trove::{IndexRecordType, Object, ObjectId, path_segments};
 
@@ -21,29 +21,17 @@ impl ReadTransactionMethods for WriteTransaction<'_, '_, '_, '_> {
 }
 
 impl WriteTransaction<'_, '_, '_, '_> {
-    pub fn where_mentioned(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
+    pub fn where_referenced(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>> {
         self.chest_transaction
             .select(
                 &vec![(
                     IndexRecordType::Direct,
-                    path_segments!("mentioned"),
-                    serde_json::to_value(thesis_id)?.try_into()?,
+                    path_segments!("content", "Text", "references"),
+                    serde_json::to_value(thesis_id)?,
                 )],
                 &vec![],
                 None,
             )?
-            .map(|mention_id| {
-                Ok(serde_json::from_value(
-                    self.chest_transaction
-                        .get(&mention_id, &path_segments!("inside"))?
-                        .with_context(|| {
-                            format!(
-                                "Can not get field 'inside' of mention with {:?}",
-                                mention_id
-                            )
-                        })?,
-                )?)
-            })
             .collect()
     }
 
@@ -145,7 +133,7 @@ impl WriteTransaction<'_, '_, '_, '_> {
             for relation_id in relations_ids {
                 self.chest_transaction.remove(&relation_id, &vec![])?;
             }
-            let where_mentioned = self.where_mentioned(thesis_id)?;
+            let where_mentioned = self.where_referenced(thesis_id)?;
             for id_of_thesis_where_mentioned in where_mentioned {
                 self.remove_thesis(&id_of_thesis_where_mentioned)?;
             }

@@ -15,6 +15,7 @@ use trove::PathSegment;
 mod tests {
     use std::collections::BTreeMap;
 
+    use fallible_iterator::FallibleIterator;
     use nanorand::{Rng, WyRand};
     use pretty_assertions::assert_eq;
     use trove::ObjectId;
@@ -55,9 +56,10 @@ mod tests {
         ];
         const PUNCTUATION: &[&str] = &[", "];
         let language = rng.generate_range(1..=2);
+        let mut references_count = 0;
         let words: Vec<String> = (0..rng.generate_range(3..=10))
             .map(|_| {
-                if previously_added_theses.is_empty() || rng.generate_range(0..=1) == 0 {
+                if previously_added_theses.is_empty() || rng.generate_range(0..=2) == 0 {
                     (0..rng.generate_range(2..=8))
                         .map(|_| {
                             if language == 1 {
@@ -68,6 +70,7 @@ mod tests {
                         })
                         .collect()
                 } else {
+                    references_count += 1;
                     format!(
                         "@{}",
                         serde_json::to_value(
@@ -190,9 +193,21 @@ mod tests {
                                 thesis
                             );
                             for referenced_thesis_id in thesis.references() {
+                                let where_referenced =
+                                    transaction.where_referenced(&referenced_thesis_id)?;
+                                dbg!(&where_referenced);
+                                for object in transaction
+                                    .chest_transaction
+                                    .objects()
+                                    .unwrap()
+                                    .collect::<Vec<_>>()
+                                    .unwrap()
+                                {
+                                    dbg!(serde_json::from_value::<Thesis>(object.value).unwrap());
+                                }
                                 assert!(
                                     transaction
-                                        .where_mentioned(&referenced_thesis_id)?
+                                        .where_referenced(&referenced_thesis_id)?
                                         .contains(&thesis_id)
                                 );
                             }
