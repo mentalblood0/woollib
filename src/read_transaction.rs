@@ -8,7 +8,7 @@ use crate::thesis::Thesis;
 
 pub struct ReadTransaction<'a> {
     pub chest_transaction: &'a trove::ReadTransaction<'a>,
-    pub sweater_config: SweaterConfig,
+    pub sweater_config: &'a SweaterConfig,
 }
 
 #[macro_export]

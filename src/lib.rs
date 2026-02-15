@@ -2,6 +2,7 @@ pub mod alias;
 pub mod aliases_resolver;
 pub mod commands;
 pub mod content;
+pub mod graph_generator;
 pub mod read_transaction;
 pub mod relation;
 pub mod sweater;
