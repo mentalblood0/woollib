@@ -51,6 +51,38 @@ impl<'a> GraphGenerator<'a> {
     }
 }
 
+impl<'a> GraphGenerator<'a> {
+    fn wrap(&self, text: &str) -> String {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let mut lines: Vec<String> = Vec::new();
+        let mut current_line = String::new();
+        let mut current_line_size = 0;
+
+        for word in words {
+            let word_size = word.len();
+
+            if current_line.is_empty() {
+                current_line = word.to_string();
+                current_line_size = word_size;
+            } else if current_line_size + 1 + word_size <= self.config.wrap_width as usize {
+                current_line.push(' ');
+                current_line.push_str(word);
+                current_line_size += 1 + word_size;
+            } else {
+                lines.push(current_line);
+                current_line = word.to_string();
+                current_line_size = word_size;
+            }
+        }
+
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+
+        lines.join("<br/>")
+    }
+}
+
 impl<'a> FallibleIterator for GraphGenerator<'a> {
     type Item = String;
     type Error = Error;
@@ -71,7 +103,7 @@ impl<'a> FallibleIterator for GraphGenerator<'a> {
                     };
                     match thesis.content {
                         Content::Text(ref text) => {
-                            let node_body_text = text.composed();
+                            let node_body_text = self.wrap(&text.composed());
                             let node_header = format!(
                                 r#"<TR><TD BORDER="1" SIDES="b">{node_header_text}</TD></TR>"#,
                             );
