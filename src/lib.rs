@@ -293,17 +293,17 @@ mod tests {
 
                 std::fs::write(
                     "/tmp/woollib_example_graph.dot",
-                    GraphGenerator {
-                        config: &GraphGeneratorConfig {
+                    GraphGenerator::new(
+                        &GraphGeneratorConfig {
                             wrap_width: 64,
                             externalize_relations_nodes: ExternalizeRelationsNodes::None,
                             show_nodes_references: ShowNodesReferences::All,
                         },
-                        theses_iterator: &mut transaction
+                        &mut transaction
                             .chest_transaction
                             .objects()?
                             .map(|object| Ok(serde_json::from_value(object.value)?)),
-                    }
+                    )
                     .collect::<Vec<_>>()?
                     .join(""),
                 )?;
