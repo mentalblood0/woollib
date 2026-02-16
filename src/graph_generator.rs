@@ -1,26 +1,25 @@
 use anyhow::{Error, Result};
 use fallible_iterator::FallibleIterator;
+use serde::{Deserialize, Serialize};
 
 use crate::content::Content;
-use crate::read_transaction::ReadTransactionMethods;
-use crate::relation::Relation;
-use crate::text::Text;
 use crate::thesis::Thesis;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExternalizeRelationsNodes {
     None,
     Related,
     All,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShowNodesReferences {
     None,
     Mentioned,
     All,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct GraphGeneratorConfig {
     pub wrap_width: u16,
     pub externalize_relations_nodes: ExternalizeRelationsNodes,
@@ -38,38 +37,46 @@ impl<'a> FallibleIterator for GraphGenerator<'a> {
 
     fn next(&mut self) -> Result<Option<Self::Item>> {
         Ok(if let Some(thesis) = self.theses_iterator.next()? {
-            let node_id_string = thesis.id()?.to_string();
+            let thesis_id_string = thesis.id()?.to_string();
             let node_header_text = if let Some(ref alias) = thesis.alias {
                 alias.0.clone()
             } else {
-                node_id_string.clone()
+                thesis_id_string.clone()
             };
             match thesis.content {
                 Content::Text(ref text) => {
                     let node_body_text = text.composed();
-                    let node_header = format!(
-                        r#"<TR><TD BORDER="1" SIDES="b">{}</TD></TR>"#,
-                        node_header_text
-                    );
+                    let node_header =
+                        format!(r#"<TR><TD BORDER="1" SIDES="b">{node_header_text}</TD></TR>"#,);
                     let node_label = format!(
-                        r#"<TABLE BORDER="2" CELLSPACING="0" CELLPADDING="8">{}<TR><TD BORDER="0">#{}</TD></TR></TABLE>"#,
+                        r#"<TABLE BORDER="2" CELLSPACING="0" CELLPADDING="8">{}<TR><TD BORDER="0">{}</TD></TR></TABLE>"#,
                         node_header, node_body_text
                     );
                     Some(
                         format!(
-                            r#"\n\t"{}" [label=<{}>, shape=plaintext];"#, // node definition
-                            node_id_string, node_label
+                            "\n\t\"{}\" [label=<{}>, shape=plaintext];", // node definition
+                            thesis_id_string, node_label
                         ) + &thesis // node references arrows definitions
                             .references()
                             .iter()
-                            .map(|referenced_thesis_id| {
-                                format!("\n\t{}", referenced_thesis_id.to_string())
-                            })
+                            .map(|referenced_thesis_id| format!("\n\t\"{thesis_id_string}\" -> \"{}\" [arrowhead=none, color=\"grey\" style=dotted];", referenced_thesis_id.to_string()))
                             .collect::<Vec<_>>()
                             .join(""),
                     )
                 }
-                Content::Relation(ref relation) => None,
+                Content::Relation(ref relation) => {
+                    let node_label = format!(
+                        r#"<TABLE CELLSPACING="0" STYLE="dashed"><TR><TD SIDES="b" STYLE="dashed">{node_header_text}</TD></TR><TR><TD BORDER="0">{}</TD></TR></TABLE>"#,
+                        relation.kind.0
+                    );
+                    Some(format!(
+                        "\n\t\"{thesis_id_string}\" [label=<{node_label}>, shape=plaintext];\n\t\"{}\" -> \"{}\" [dir=back, arrowtail=tee];\n\t\"{}\" -> \"{}\";",
+                        relation.from.to_string(), // arrow to relation node
+                        thesis_id_string,
+                        thesis_id_string, // arrow from relation node
+                        relation.to.to_string()
+                    ))
+                }
             }
         } else {
             None

@@ -25,6 +25,9 @@ mod tests {
     use crate::aliases_resolver::AliasesResolver;
     use crate::commands::CommandsIterator;
     use crate::content::Content;
+    use crate::graph_generator::{
+        ExternalizeRelationsNodes, GraphGenerator, GraphGeneratorConfig, ShowNodesReferences,
+    };
     use crate::read_transaction::ReadTransactionMethods;
     use crate::relation::Relation;
     use crate::sweater::Sweater;
@@ -287,6 +290,24 @@ mod tests {
                 for command in commands {
                     transaction.execute_command(&command)?;
                 }
+
+                std::fs::write(
+                    "/tmp/woollib_example_graph.dot",
+                    GraphGenerator {
+                        config: &GraphGeneratorConfig {
+                            wrap_width: 64,
+                            externalize_relations_nodes: ExternalizeRelationsNodes::None,
+                            show_nodes_references: ShowNodesReferences::All,
+                        },
+                        theses_iterator: &mut transaction
+                            .chest_transaction
+                            .objects()?
+                            .map(|object| Ok(serde_json::from_value(object.value)?)),
+                    }
+                    .collect::<Vec<_>>()?
+                    .join(""),
+                )?;
+
                 Ok(())
             })
             .unwrap();

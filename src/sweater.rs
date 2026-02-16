@@ -56,7 +56,7 @@ impl Sweater {
             .lock_all_writes_and_read(|chest_read_transaction| {
                 f(ReadTransaction {
                     chest_transaction: &chest_read_transaction,
-                    sweater_config: self.config.clone(),
+                    sweater_config: &self.config,
                 })
             })
             .with_context(
