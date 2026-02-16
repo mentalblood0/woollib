@@ -1,6 +1,6 @@
 # 🐈 Woollib
 
-A Rust library for managing theses and relations, supports tagging, aliasing and graph generation.
+A Rust library for managing theses. Each thesis is either text or relation. Supports tagging, aliasing and graph generation.
 
 ## Overview
 
@@ -8,36 +8,36 @@ Woollib provides a structured way to manage interconnected ideas (theses) and th
 
 ## Key Features
 
-- **Theses Management**: Create, store, and retrieve propositions with unique identifiers
-- **Relations**: Define relationships between theses (e.g., "includes", "therefore", "negates", "answers" or any other defined in configuration file)
-- **Tags**: Categorize theses with custom tags for organization
-- **Text-Based Commands**: Simple syntax to add theses, relations, tags, and aliases from plain text
-- **Aliases**: Use short, human-readable names for referencing theses
-- **Graph Generation**: Export your knowledge graph to DOT format for visualization
-- **ACID Transactions**: Thread-safe operations with full transaction support
+- **Theses Management**: create, store, and retrieve propositions with unique identifiers
+- **Relations**: define relationships between theses (e.g., "includes", "therefore", "negates", "answers" or any other defined in configuration file)
+- **Tags**: categorize theses with custom tags for organization
+- **Text-Based Commands**: simple syntax to add theses, relations, tags, and aliases from plain text
+- **Aliases**: use short, human-readable names for referencing theses
+- **Graph Generation**: export your knowledge graph to DOT format for visualization
+- **ACID Transactions**: thread-safe operations with full transaction support
 
 ## Architecture
 
-- **Sweater**: Main entry point, manages database and configuration
-- **Thesis**: A proposition with content (text or relation) and tags
-- **Relation**: Directed connection between two theses with a kind
-- **Tag**: Categorization label for theses
-- **Alias**: Human-readable name for referencing theses
-- **ReadTransaction/WriteTransaction**: Safe database access with ACID guarantees
+- **Sweater**: main entry point, manages database and configuration
+- **Thesis**: a proposition with content (text or relation) and tags
+- **Relation**: directed connection between two theses with a kind
+- **Tag**: categorization label for theses
+- **Alias**: human-readable name for referencing theses
+- **ReadTransaction/WriteTransaction**: safe database access with ACID guarantees
 
 ## Commands Format
 
-- `+ alias` - Add text thesis (next line is content)
-- `+ alias` - Add relation thesis (next 3 lines: from, relation_kind, to)
-- `- alias` - Remove thesis
-- `# alias tag1 tag2...` - Add tags to thesis
-- `^ alias tag1 tag2...` - Remove tags from thesis
+- `+ alias` - add text thesis (next line is content)
+- `+ alias` - add relation thesis (next 3 lines: from, relation_kind, to)
+- `- alias` - remove thesis
+- `# alias tag1 tag2...` - add tags to thesis
+- `^ alias tag1 tag2...` - remove tags from thesis
 
 See [`src/example.txt`](src/example.txt) for a complete philosophical argument about relativism vs. absolutism. This example demonstrates:
-- Creating theses with content and relations
-- Using aliases for convenient referencing
-- Adding tags for categorization
-- Building complex argument structures
+- creating theses with content and relations
+- using aliases for convenient referencing
+- adding tags for categorization
+- building complex argument structures
 
 ## Dependencies
 
@@ -57,8 +57,8 @@ cargo test
 ```
 
 The test suite includes:
-- **Generative tests**: Randomly generates theses and relations to verify consistency
-- **Example tests**: Parses and processes the example file
+- **Generative tests**: performs randomly generated theses and relations actions to verify consistency
+- **Example tests**: parses and processes the example file
 
 ## License
 
