@@ -7,7 +7,7 @@ use crate::alias::Alias;
 use crate::aliases_resolver::AliasesResolver;
 use crate::commands::Reference;
 
-#[derive(Serialize, Deserialize, Debug, Clone, bincode::Encode, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RawText(pub String);
 
 impl RawText {
