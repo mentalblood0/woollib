@@ -27,12 +27,6 @@ Woollib provides a structured way to manage interconnected ideas (theses) and th
 
 ## Commands Format
 
-- `+ alias` - add text thesis (next line is content)
-- `+ alias` - add relation thesis (next 3 lines: from, relation_kind, to)
-- `- alias` - remove thesis
-- `# alias tag1 tag2...` - add tags to thesis
-- `^ alias tag1 tag2...` - remove tags from thesis
-
 See [`src/example.txt`](src/example.txt) for a complete philosophical argument about relativism vs. absolutism. This example demonstrates:
 - creating theses with content and relations
 - using aliases for convenient referencing
