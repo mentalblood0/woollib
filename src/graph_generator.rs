@@ -53,33 +53,47 @@ impl<'a> GraphGenerator<'a> {
 
 impl<'a> GraphGenerator<'a> {
     fn wrap(&self, text: &str) -> String {
-        let words: Vec<&str> = text.split_whitespace().collect();
-        let mut lines: Vec<String> = Vec::new();
+        let wrap_width = self.config.wrap_width as usize;
+        if wrap_width == 0 {
+            return String::new();
+        }
+
+        let mut result = String::with_capacity(text.len() + (text.len() / wrap_width) * 5);
         let mut current_line = String::new();
         let mut current_line_size = 0;
+        let mut first_line = true;
 
-        for word in words {
+        for word in text.split_whitespace() {
             let word_size = word.len();
 
             if current_line.is_empty() {
-                current_line = word.to_string();
+                current_line.reserve(word_size);
+                current_line.push_str(word);
                 current_line_size = word_size;
-            } else if current_line_size + 1 + word_size <= self.config.wrap_width as usize {
+            } else if current_line_size + 1 + word_size <= wrap_width {
                 current_line.push(' ');
                 current_line.push_str(word);
                 current_line_size += 1 + word_size;
             } else {
-                lines.push(current_line);
-                current_line = word.to_string();
+                if !first_line {
+                    result.push_str("<br/>");
+                }
+                result.push_str(&current_line);
+                first_line = false;
+                current_line = String::with_capacity(word_size);
+                current_line.push_str(word);
                 current_line_size = word_size;
             }
         }
 
         if !current_line.is_empty() {
-            lines.push(current_line);
+            if !first_line {
+                result.push_str("<br/>");
+            }
+            result.push_str(&current_line);
         }
 
-        lines.join("<br/>")
+        result
     }
 }
 
