@@ -196,7 +196,7 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                                 anyhow!(
                                     "Can not parse {}-th paragraph {paragraph:?}: looks like it \
                                      is command for setting alias, yet there is no new alias \
-                                     provided in first line after '@' symbol",
+                                     provided in first line after '@' character",
                                     paragraph_index + 1
                                 )
                             })?;

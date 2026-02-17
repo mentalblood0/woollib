@@ -17,7 +17,7 @@ impl Tag {
             Ok(self)
         } else {
             Err(anyhow!(
-                "Tag must be a word symbols sequence, so {:?} does not seem to be tag",
+                "Tag must be a word characters sequence, so {:?} does not seem to be tag",
                 self.0
             ))
         }

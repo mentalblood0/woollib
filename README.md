@@ -1,48 +1,136 @@
 # 🐈 Woollib
 
-A Rust library for managing theses. Each thesis is either text or relation. Supports tagging, aliasing and graph generation.
+A Rust library for managing theses backed with [trove](https://github.com/mentalblood0/trove)
 
-## Overview
+Each thesis is either text or relation between two existing theses
 
-Woollib provides a structured way to manage interconnected ideas (theses) and their relationships. It uses a text-based command system for easy input and generates graph visualizations. The library is built on top of [trove](https://github.com/mentalblood0/trove), an all-inexing document store for JSON-structured data.
+## Features
 
-## Key Features
+- tagging
+- aliasing
+- plain text commands processing
+- graph generation
 
-- **Theses Management**: create, store, and retrieve propositions with unique identifiers
-- **Relations**: define relationships between theses (e.g., "includes", "therefore", "negates", "answers" or any other defined in configuration file)
-- **Tags**: categorize theses with custom tags for organization
-- **Text-Based Commands**: simple syntax to add theses, relations, tags, and aliases from plain text
-- **Aliases**: use short, human-readable names for referencing theses
-- **Graph Generation**: export your knowledge graph to DOT format for visualization
-- **ACID Transactions**: thread-safe operations with full transaction support
+## Basic concepts
 
-## Architecture
+### Thesis
 
-- **Sweater**: main entry point, manages database and configuration
-- **Thesis**: a proposition with content (text or relation) and tags
-- **Relation**: directed connection between two theses with a kind
-- **Tag**: categorization label for theses
-- **Alias**: human-readable name for referencing theses
-- **ReadTransaction/WriteTransaction**: safe database access with ACID guarantees
+- optional **alias**
+- **tag**s
+- content: **text** or **relation**
 
-## Commands Format
+**Thesis identifier** is 16 bytes fully determined by it's content (hash of text for text content and hash of binary representation of relation structure for relation content, hash function used is `xxhash128`) and represented in text and commands as url-safe non-padded base64 string, e.g. `ZqavF73LC9OQwCptOMUf1w`
 
-See [`src/example.txt`](src/example.txt) for a complete philosophical argument about relativism vs. absolutism. This example demonstrates:
-- creating theses with content and relations
-- using aliases for convenient referencing
-- adding tags for categorization
-- building complex argument structures
+#### Alias
 
-## Dependencies
+Sequence of one or more non-whitespace characters, e.g. `(R-r).0`
 
-- `trove` - database backend
-- `serde`/`serde_json` - serialization to use with `trove`
-- `regex` - commands parsing, text validation
-- `xxhash-rust` - hashing
-- `anyhow` - error handling
-- `fallible-iterator` - Safe iterator usage with error handling
-- `bincode` - binary serialization to generate identifiers as hashes of binary-encoded relation structure
-- `html-escape` - encoding aliases for graph output
+#### Tag
+
+Word characters sequence, e.g. `absolute_truth`
+
+#### Text
+
+- **raw text** with **references** inserted in it, e.g. `[(R-r).0] относительно истинно`
+
+##### Reference
+
+**Thesis identifier** or **alias** surrounded with square brackets, e.g. `[lvKjiQU1MkRfVFyJrWEaog]` `[релятивизм]`
+
+##### Raw text part
+
+Cyrillic/Latin text: letters, whitespaces and punctuation marks `,-:.'"`
+
+#### Relation
+
+- thesis id from which it is
+- **relation kind**
+- thesis id to which it is
+
+Supported relations kinds list is set in Sweater configuration file, e.g. see [`src/test_sweater_config.yml`](src/test_sweater_config.yml), so you can specify and use any relations kinds you like
+
+##### Relation kind
+
+An English words sequence without punctuation, e.g. `may be`, `therefore`
+
+## Commands
+
+If there is more then one command to parse, they must be delimited with two or more line breaks, e.g. see [`src/example.txt`](src/example.txt)
+
+### Add text thesis
+
+Two lines:
+
+- `+` optionally followed by space and alias for this thesis 
+- text
+
+e.g.
+
+```
++ (R-r).0_true_relatively
+[(R-r).0] относительно истинно
+```
+
+### Add relation thesis
+
+Four lines:
+
+- `+` optionally followed by space and **alias** for this thesis 
+- **thesis identifier** or **alias** of thesis *from* which this relation is
+- **relation kind**
+- **thesis identifier** or **alias** of thesis *to* which this relation is
+
+e.g.
+
+```
++ 
+(R-r).d
+therefore
+(R-r).0
+```
+
+### Remove thesis
+
+Two lines:
+
+- `-`
+- **thesis identifier** or **alias** of thesis to remove
+
+e.g.
+
+```
++ 
+(R-r).d
+```
+
+Note that this will also remove all related and referencing theses
+
+### Tag thesis
+
+Three or more lines:
+
+- `#`
+- **thesis identifier** or **alias** of thesis to which add tags
+- **tag** to add
+- ...
+
+### Untag thesis
+
+Three or more lines:
+
+- `^`
+- **thesis identifier** or **alias** of thesis from which remove tags
+- **tag** to remove
+- ...
+
+### Set alias
+
+Two lines:
+
+- `+` followed by space and **alias** to set for this thesis 
+- **thesis identifier** or current **alias** of thesis for which to set alias from first line
+
+Thesis can have no alias or one alias, so setting alias for already aliased thesis will replace it's alias. Internally theses are reference and relate to each other using theses identifiers, so replacing aliases won't break anything
 
 ## Testing
 
@@ -53,7 +141,3 @@ cargo test
 The test suite includes:
 - **Generative tests**: performs randomly generated theses and relations actions to verify consistency
 - **Example tests**: parses and processes the example file
-
-## License
-
-MIT
