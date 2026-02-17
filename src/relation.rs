@@ -10,7 +10,7 @@ impl RelationKind {
     pub fn validated(&self) -> Result<&Self> {
         static RELATION_KIND_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
         let sentence_regex = RELATION_KIND_REGEX.get_or_init(|| {
-            Regex::new(r"^[\w\s]+$")
+            Regex::new(r"^[\w ]+$")
                 .with_context(|| "Can not compile regular expression for relation kind validation")
                 .unwrap()
         });
