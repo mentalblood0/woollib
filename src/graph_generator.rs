@@ -145,7 +145,7 @@ impl<'a> FallibleIterator for GraphGenerator<'a> {
                         }
                         Content::Relation(ref relation) => {
                             let node_label = format!(
-                                r#"<TABLE CELLSPACING="0" STYLE="dashed"><TR><TD SIDES="b" STYLE="dashed">{node_header_text}</TD></TR><TR><TD BORDER="0">{}</TD></TR></TABLE>"#,
+                                r#"<TABLE CELLSPACING="0" CELLPADDING="8" STYLE="dashed"><TR><TD SIDES="b" STYLE="dashed">{node_header_text}</TD></TR><TR><TD BORDER="0">{}</TD></TR></TABLE>"#,
                                 relation.kind.0
                             );
                             Some(format!(
