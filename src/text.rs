@@ -22,9 +22,8 @@ impl RawText {
             Ok(self)
         } else {
             Err(anyhow!(
-                "Text part around mentions must be one English or Russian sentence part: letters, \
-                 whitespaces, punctuation ,-:.'\" and references thesis id or alias put inside \
-                 square brackets [], so {:?} does not seem to be text",
+                "Text part around references must be Cyrillic/Latin text: letters, whitespaces, \
+                 punctuation ,-:.'\", so {:?} does not seem to be text",
                 self.0
             ))
         }
