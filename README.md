@@ -35,7 +35,7 @@ Word characters sequence, e.g. `absolute_truth`
 
 ##### Reference
 
-**Thesis identifier** or **alias** surrounded with square brackets, e.g. `[lvKjiQU1MkRfVFyJrWEaog]` `[релятивизм]`
+**Thesis identifier** or **alias** surrounded with square brackets, e.g. `[lvKjiQU1MkRfVFyJrWEaog]`, `[релятивизм]`
 
 ##### Raw text part
 
@@ -43,9 +43,9 @@ Cyrillic/Latin text: letters, whitespaces and punctuation marks `,-:.'"`
 
 #### Relation
 
-- thesis id from which it is
+- **thesis identifier** from which it is
 - **relation kind**
-- thesis id to which it is
+- **thesis identifier** to which it is
 
 Supported relations kinds list is set in Sweater configuration file, e.g. see [`src/test_sweater_config.yml`](src/test_sweater_config.yml), so you can specify and use any relations kinds you like
 
@@ -114,6 +114,15 @@ Three or more lines:
 - **tag** to add
 - ...
 
+e.g.
+
+```
+#
+(R-r).0
+total
+truth
+```
+
 ### Untag thesis
 
 Three or more lines:
@@ -123,6 +132,15 @@ Three or more lines:
 - **tag** to remove
 - ...
 
+e.g.
+
+```
+^
+(R-r).0
+total
+truth
+```
+
 ### Set alias
 
 Two lines:
@@ -131,13 +149,3 @@ Two lines:
 - **thesis identifier** or current **alias** of thesis for which to set alias from first line
 
 Thesis can have no alias or one alias, so setting alias for already aliased thesis will replace it's alias. Internally theses are reference and relate to each other using theses identifiers, so replacing aliases won't break anything
-
-## Testing
-
-```bash
-cargo test
-```
-
-The test suite includes:
-- **Generative tests**: performs randomly generated theses and relations actions to verify consistency
-- **Example tests**: parses and processes the example file
