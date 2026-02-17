@@ -223,13 +223,11 @@ mod tests {
                                 .unwrap()
                                 .clone();
                             transaction.tag_thesis(&thesis_to_tag_id, tag_to_add.clone())?;
-                            assert!(
-                                transaction
-                                    .get_thesis(&thesis_to_tag_id)?
-                                    .unwrap()
-                                    .tags
-                                    .contains(&tag_to_add)
-                            );
+                            assert!(transaction
+                                .get_thesis(&thesis_to_tag_id)?
+                                .unwrap()
+                                .tags
+                                .contains(&tag_to_add));
                             previously_added_theses
                                 .get_mut(&thesis_to_tag_id)
                                 .unwrap()
@@ -248,13 +246,11 @@ mod tests {
                                 let tag_to_remove =
                                     thesis_to_untag.tags[tag_to_remove_index].clone();
                                 transaction.untag_thesis(&thesis_to_untag_id, &tag_to_remove)?;
-                                assert!(
-                                    !transaction
-                                        .get_thesis(&thesis_to_untag_id)?
-                                        .unwrap()
-                                        .tags
-                                        .contains(&tag_to_remove)
-                                );
+                                assert!(!transaction
+                                    .get_thesis(&thesis_to_untag_id)?
+                                    .unwrap()
+                                    .tags
+                                    .contains(&tag_to_remove));
                                 previously_added_theses
                                     .get_mut(&thesis_to_untag_id)
                                     .unwrap()

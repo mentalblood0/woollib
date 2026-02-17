@@ -1,6 +1,6 @@
 use anyhow::Result;
 use fallible_iterator::FallibleIterator;
-use trove::{IndexRecordType, ObjectId, path_segments};
+use trove::{path_segments, IndexRecordType, ObjectId};
 
 use crate::alias::Alias;
 use crate::sweater::SweaterConfig;

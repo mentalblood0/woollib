@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,8 @@ impl Alias {
             Ok(self)
         } else {
             Err(anyhow!(
-                "Alias must be sequence of one or more non-whitespace characters, so {:?} does not seem to be text",
+                "Alias must be sequence of one or more non-whitespace characters, so {:?} does \
+                 not seem to be text",
                 self.0
             ))
         }

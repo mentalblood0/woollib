@@ -59,9 +59,9 @@ impl Sweater {
                     sweater_config: &self.config,
                 })
             })
-            .with_context(
-                || "Can not lock all write operations on chest and initiate read transaction",
-            )?;
+            .with_context(|| {
+                "Can not lock all write operations on chest and initiate read transaction"
+            })?;
         Ok(self)
     }
 }

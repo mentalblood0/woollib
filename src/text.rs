@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use trove::ObjectId;
@@ -22,7 +22,9 @@ impl RawText {
             Ok(self)
         } else {
             Err(anyhow!(
-                "Text part around mentions must be one English or Russian sentence part: letters, whitespaces, punctuation ,-:.'\" and references thesis id or alias put inside square brackets [], so {:?} does not seem to be text",
+                "Text part around mentions must be one English or Russian sentence part: letters, \
+                 whitespaces, punctuation ,-:.'\" and references thesis id or alias put inside \
+                 square brackets [], so {:?} does not seem to be text",
                 self.0
             ))
         }
@@ -43,7 +45,10 @@ impl Text {
         static REFERENCE_IN_TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
         let reference_in_text_regex = REFERENCE_IN_TEXT_REGEX.get_or_init(|| {
             Regex::new(r#"\[(:?([A-Za-z0-9-_]{22})|([^\[\]]+))\]"#)
-                .with_context(|| "Can not compile regular expression to split text on raw text parts and references")
+                .with_context(|| {
+                    "Can not compile regular expression to split text on raw text parts and \
+                     references"
+                })
                 .unwrap()
         });
 
@@ -76,7 +81,17 @@ impl Text {
             {
                 result.references.push(
                     aliases_resolver
-                        .get_thesis_id_by_reference(&Reference::Alias(Alias(alias_string.to_string()))).with_context(|| anyhow!("Can not parse text {:?} with alias {:?} because do not know such alias", input, alias_string))?,
+                        .get_thesis_id_by_reference(&Reference::Alias(Alias(
+                            alias_string.to_string(),
+                        )))
+                        .with_context(|| {
+                            anyhow!(
+                                "Can not parse text {:?} with alias {:?} because do not know such \
+                                 alias",
+                                input,
+                                alias_string
+                            )
+                        })?,
                 );
             }
             last_match_end = full_reference_match.end();

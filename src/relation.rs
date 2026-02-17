@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use trove::ObjectId;
@@ -18,7 +18,8 @@ impl RelationKind {
             Ok(self)
         } else {
             Err(anyhow!(
-                "Relation kind must be an English words sequence without punctuation, so {:?} does not seem to be relation kind",
+                "Relation kind must be an English words sequence without punctuation, so {:?} \
+                 does not seem to be relation kind",
                 self.0
             ))
         }

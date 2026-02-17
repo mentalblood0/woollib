@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use anyhow::{Context, Error, Result, anyhow};
+use anyhow::{anyhow, Context, Error, Result};
 use fallible_iterator::FallibleIterator;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -128,57 +128,107 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                         )
                     })?;
                 }
-                Ok(Some(match (operation_char, lines.len()) {
-                    ('+', 2) => {
+                Ok(Some(
+                    match (operation_char, lines.len()) {
+                        ('+', 2) => {
                             let thesis = Thesis {
                                 alias: alias_option.clone(),
                                 content: Content::Text(Text::new(lines[1], self.aliases_resolver)?),
-                                tags: vec![]
-                            };
-                        if let Some(ref alias) = alias_option {
-                            self.aliases_resolver.remember(alias.clone(), thesis.id()?);
-                        }
-                        Command::AddThesis(thesis)
-                    }
-                    ('+', 4) => {
-                        let    thesis = Thesis {
-                                alias: alias_option.clone(),
-                                content: Content::Relation(Relation { from: self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?).with_context(|| format!("Can not parse relation for AddThesis command on {}-th paragraph {:?}", paragraph_index + 1, paragraph))?, kind: RelationKind(lines[2].to_string()), to: self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[3])?)? }),
                                 tags: vec![],
-                        };
-                        if let Some(ref alias) = alias_option {
-                            self.aliases_resolver.remember(alias.clone(), thesis.id()?);
+                            };
+                            if let Some(ref alias) = alias_option {
+                                self.aliases_resolver.remember(alias.clone(), thesis.id()?);
+                            }
+                            Command::AddThesis(thesis)
                         }
-                        Command::AddThesis(thesis)
+                        ('+', 4) => {
+                            let thesis = Thesis {
+                                alias: alias_option.clone(),
+                                content: Content::Relation(Relation {
+                                    from: self
+                                        .aliases_resolver
+                                        .get_thesis_id_by_reference(&Reference::new(lines[1])?)
+                                        .with_context(|| {
+                                            format!(
+                                                "Can not parse relation for AddThesis command on \
+                                                 {}-th paragraph {:?}",
+                                                paragraph_index + 1,
+                                                paragraph
+                                            )
+                                        })?,
+                                    kind: RelationKind(lines[2].to_string()),
+                                    to: self
+                                        .aliases_resolver
+                                        .get_thesis_id_by_reference(&Reference::new(lines[3])?)?,
+                                }),
+                                tags: vec![],
+                            };
+                            if let Some(ref alias) = alias_option {
+                                self.aliases_resolver.remember(alias.clone(), thesis.id()?);
+                            }
+                            Command::AddThesis(thesis)
+                        }
+                        ('-', 2) => Command::RemoveThesis(
+                            self.aliases_resolver
+                                .get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
+                        ),
+                        ('#', 3..) => Command::AddTags(
+                            self.aliases_resolver
+                                .get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
+                            lines[2..]
+                                .iter()
+                                .map(|tag_string| Tag(tag_string.to_string()))
+                                .collect(),
+                        ),
+                        ('^', 3..) => Command::RemoveTags(
+                            self.aliases_resolver
+                                .get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
+                            lines[2..]
+                                .iter()
+                                .map(|tag_string| Tag(tag_string.to_string()))
+                                .collect(),
+                        ),
+                        ('@', 2) => {
+                            let thesis_id = self
+                                .aliases_resolver
+                                .get_thesis_id_by_reference(&Reference::new(lines[1])?)?;
+                            let alias = alias_option.ok_or_else(|| {
+                                anyhow!(
+                                    "Can not parse {}-th paragraph {paragraph:?}: looks like it \
+                                     is command for setting alias, yet there is no new alias \
+                                     provided in first line after '@' symbol",
+                                    paragraph_index + 1
+                                )
+                            })?;
+                            self.aliases_resolver
+                                .remember(alias.clone(), thesis_id.clone());
+                            Command::SetAlias(thesis_id, alias)
+                        }
+                        _ => {
+                            return Err(anyhow!(
+                                "Unsupported operation character and lines count combination \
+                                 ({:?}, {}) in first line {:?} of {}-th paragraph {:?}, supported \
+                                 combinations are ('+', 2) for adding text thesis, ('+', 4) for \
+                                 adding relation thesis, ('-', 2) for removing thesis, ('#', 3) \
+                                 for adding tag, ('^', 3) for removing tag",
+                                operation_char,
+                                lines.len(),
+                                lines[0],
+                                paragraph_index + 1,
+                                paragraph
+                            ));
+                        }
                     }
-                    ('-', 2) => Command::RemoveThesis(
-                        self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
-                    ),
-                    ('#', 3..) => Command::AddTags(
-                        self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
-                        lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
-                    ),
-                    ('^', 3..) => Command::RemoveTags(
-                        self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
-                        lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
-                    ),
-                    ('@', 2) => {
-                        let thesis_id = self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?;
-                        let alias = alias_option.ok_or_else(|| anyhow!("Can not parse {}-th paragraph {paragraph:?}: looks like it is command for setting alias, yet there is no new alias provided in first line after '@' symbol", paragraph_index + 1))?;
-                        self.aliases_resolver.remember(alias.clone(), thesis_id.clone());
-                        Command::SetAlias(thesis_id, alias)
-                    }
-                    _ => {
-                        return Err(anyhow!(
-                            "Unsupported operation character and lines count combination ({:?}, {}) in first line {:?} of {}-th paragraph {:?}, supported combinations are ('+', 2) for adding text thesis, ('+', 4) for adding relation thesis, ('-', 2) for removing thesis, ('#', 3) for adding tag, ('^', 3) for removing tag",
-                            operation_char,
-                            lines.len(),
-                            lines[0],
+                    .validated()
+                    .with_context(|| {
+                        format!(
+                            "Invalid command parsed from {}-th paragraph {:?}",
                             paragraph_index + 1,
                             paragraph
-                        ));
-                    }
-                }.validated().with_context(|| format!("Invalid command parsed from {}-th paragraph {:?}", paragraph_index + 1, paragraph))?.to_owned()))
+                        )
+                    })?
+                    .to_owned(),
+                ))
             } else {
                 Err(anyhow!(
                     "Can not parse first line {:?} in {}-th paragraph {:?}",

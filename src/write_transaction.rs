@@ -1,6 +1,6 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use fallible_iterator::FallibleIterator;
-use trove::{IndexRecordType, Object, ObjectId, path_segments};
+use trove::{path_segments, IndexRecordType, Object, ObjectId};
 
 use crate::alias::Alias;
 use crate::commands::Command;
@@ -30,7 +30,8 @@ impl WriteTransaction<'_, '_, '_, '_> {
         let thesis_id = thesis.id()?;
         if self.chest_transaction.contains_object_with_id(&thesis_id)? {
             Err(anyhow!(
-                "Can not insert thesis {thesis:?} with id {thesis_id:?} as chest already contains object with such id"
+                "Can not insert thesis {thesis:?} with id {thesis_id:?} as chest already contains \
+                 object with such id"
             ))
         } else {
             if let Content::Relation(Relation {
@@ -45,7 +46,8 @@ impl WriteTransaction<'_, '_, '_, '_> {
                     .contains(&relation_kind)
                 {
                     return Err(anyhow!(
-                        "Can not insert relation {thesis:?} of kind {relation_kind:?} in sweater with supported relations kinds {:?} as it's kind is not supported",
+                        "Can not insert relation {thesis:?} of kind {relation_kind:?} in sweater \
+                         with supported relations kinds {:?} as it's kind is not supported",
                         self.sweater_config.supported_relations_kinds
                     ));
                 }
@@ -56,7 +58,8 @@ impl WriteTransaction<'_, '_, '_, '_> {
                         .is_none()
                     {
                         return Err(anyhow!(
-                            "Can not insert relation {thesis:?} in sweater without inserted thesis with {related_id:?}"
+                            "Can not insert relation {thesis:?} in sweater without inserted \
+                             thesis with {related_id:?}"
                         ));
                     }
                 }

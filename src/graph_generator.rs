@@ -126,16 +126,22 @@ impl<'a> FallibleIterator for GraphGenerator<'a> {
                                 node_header, node_body_text
                             );
                             Some(
-                        format!(
-                            "\n\t\"{}\" [label=<{}>, shape=plaintext];", // node definition
-                            thesis_id_string, node_label
-                        ) + &thesis // node references arrows definitions
-                            .references()
-                            .iter()
-                            .map(|referenced_thesis_id| format!("\n\t\"{thesis_id_string}\" -> \"{}\" [arrowhead=none, color=\"grey\" style=dotted];", referenced_thesis_id.to_string()))
-                            .collect::<Vec<_>>()
-                            .join(""),
-                    )
+                                format!(
+                                    "\n\t\"{}\" [label=<{}>, shape=plaintext];", // node definition
+                                    thesis_id_string, node_label
+                                ) + &thesis // node references arrows definitions
+                                    .references()
+                                    .iter()
+                                    .map(|referenced_thesis_id| {
+                                        format!(
+                                            "\n\t\"{thesis_id_string}\" -> \"{}\" \
+                                             [arrowhead=none, color=\"grey\" style=dotted];",
+                                            referenced_thesis_id.to_string()
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(""),
+                            )
                         }
                         Content::Relation(ref relation) => {
                             let node_label = format!(
@@ -143,7 +149,9 @@ impl<'a> FallibleIterator for GraphGenerator<'a> {
                                 relation.kind.0
                             );
                             Some(format!(
-                                "\n\t\"{thesis_id_string}\" [label=<{node_label}>, shape=plaintext];\n\t\"{}\" -> \"{}\" [dir=back, arrowtail=tee];\n\t\"{}\" -> \"{}\";",
+                                "\n\t\"{thesis_id_string}\" [label=<{node_label}>, \
+                                 shape=plaintext];\n\t\"{}\" -> \"{}\" [dir=back, \
+                                 arrowtail=tee];\n\t\"{}\" -> \"{}\";",
                                 relation.from.to_string(), // arrow to relation node
                                 thesis_id_string,
                                 thesis_id_string, // arrow from relation node
