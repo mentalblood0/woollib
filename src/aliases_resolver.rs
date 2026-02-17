@@ -22,12 +22,9 @@ impl<'a> AliasesResolver<'a> {
                 if let Some(result) = self.known_aliases.get(alias) {
                     result.clone()
                 } else {
-                    let result = self
-                        .read_able_transaction
+                    self.read_able_transaction
                         .get_thesis_id_by_alias(alias)?
-                        .ok_or_else(|| anyhow!("Can not find thesis id by alias {alias:?}"))?;
-                    self.known_aliases.insert(alias.clone(), result.clone());
-                    result
+                        .ok_or_else(|| anyhow!("Can not find thesis id by alias {alias:?}"))?
                 }
             }
         })

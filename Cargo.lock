@@ -290,7 +290,7 @@ dependencies = [
 [[package]]
 name = "lawn"
 version = "0.1.0"
-source = "git+https://github.com/mentalblood0/lawn#f05f1e2633ca79320297df7cdf37973e6dfe5e0b"
+source = "git+https://github.com/mentalblood0/lawn#139cc1567f3d20320d38f2756dfc83d0bb3500cd"
 dependencies = [
  "anyhow",
  "bincode",

@@ -38,6 +38,7 @@ pub enum Command {
     RemoveThesis(ObjectId),
     AddTags(ObjectId, Vec<Tag>),
     RemoveTags(ObjectId, Vec<Tag>),
+    SetAlias(ObjectId, Alias),
 }
 
 impl Command {
@@ -56,6 +57,9 @@ impl Command {
                 for tag in tags.iter() {
                     tag.validated()?;
                 }
+            }
+            Command::SetAlias(_, alias) => {
+                alias.validated()?;
             }
         }
         Ok(self)
@@ -105,7 +109,7 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
             static COMMAND_FIRST_LINE_REGEX: std::sync::OnceLock<Regex> =
                 std::sync::OnceLock::new();
             let command_first_line_regex = COMMAND_FIRST_LINE_REGEX.get_or_init(|| {
-                Regex::new(r#"^ *(\+|-|#|\^)(:? +([^ ]+))? *$"#)
+                Regex::new(r#"^ *(\+|-|#|\^|@)(:? +([^ ]+))? *$"#)
                     .with_context(|| "Can not compile regular expression for commands splitting")
                     .unwrap()
             });
@@ -152,12 +156,18 @@ impl<'a> FallibleIterator for CommandsIterator<'a> {
                     ),
                     ('#', 3..) => Command::AddTags(
                         self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
-                         lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
-                    ),
-                    ('^', 3..) => Command::RemoveTags(
-                         self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
                         lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
                     ),
+                    ('^', 3..) => Command::RemoveTags(
+                        self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?,
+                        lines[2..].iter().map(|tag_string|  Tag(tag_string.to_string())).collect(),
+                    ),
+                    ('@', 2) => {
+                        let thesis_id = self.aliases_resolver.get_thesis_id_by_reference(&Reference::new(lines[1])?)?;
+                        let alias = alias_option.ok_or_else(|| anyhow!("Can not parse {}-th paragraph {paragraph:?}: looks like it is command for setting alias, yet there is no new alias provided in first line after '@' symbol", paragraph_index + 1))?;
+                        self.aliases_resolver.remember(alias.clone(), thesis_id.clone());
+                        Command::SetAlias(thesis_id, alias)
+                    }
                     _ => {
                         return Err(anyhow!(
                             "Unsupported operation character and lines count combination ({:?}, {}) in first line {:?} of {}-th paragraph {:?}, supported combinations are ('+', 2) for adding text thesis, ('+', 4) for adding relation thesis, ('-', 2) for removing thesis, ('#', 3) for adding tag, ('^', 3) for removing tag",

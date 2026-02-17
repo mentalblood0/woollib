@@ -132,6 +132,15 @@ impl WriteTransaction<'_, '_, '_, '_> {
         Ok(())
     }
 
+    pub fn set_alias(&mut self, thesis_id: ObjectId, new_alias: Alias) -> Result<()> {
+        self.chest_transaction.update(
+            thesis_id,
+            path_segments!("alias"),
+            serde_json::to_value(new_alias)?,
+        )?;
+        Ok(())
+    }
+
     pub fn execute_command(&mut self, command: &Command) -> Result<&Self> {
         match command {
             Command::AddThesis(thesis) => self.insert_thesis(thesis.clone())?,
@@ -145,6 +154,9 @@ impl WriteTransaction<'_, '_, '_, '_> {
                 for tag in tags {
                     self.untag_thesis(thesis_id, tag)?;
                 }
+            }
+            Command::SetAlias(thesis_id, new_alias) => {
+                self.set_alias(thesis_id.clone(), new_alias.clone())?;
             }
         };
         Ok(self)
