@@ -1,5 +1,7 @@
 # 🐈 Woollib
 
+[![tests](https://github.com/mentalblood0/woollib/actions/workflows/tests.yml/badge.svg)](https://github.com/mentalblood0/woollib/actions/workflows/tests.yml)
+
 A Rust library for managing theses backed with [trove](https://github.com/mentalblood0/trove)
 
 Each thesis is either text or relation between two existing theses
