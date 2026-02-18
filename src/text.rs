@@ -6,6 +6,7 @@ use trove::ObjectId;
 use crate::alias::Alias;
 use crate::aliases_resolver::AliasesResolver;
 use crate::commands::Reference;
+use crate::read_transaction::ReadTransactionMethods;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RawText(pub String);
@@ -39,7 +40,7 @@ pub struct Text {
     pub start_with_reference: bool,
 }
 
-impl Text {
+impl<'a> Text {
     pub fn new(input: &str, aliases_resolver: &mut AliasesResolver) -> Result<Self> {
         static REFERENCE_IN_TEXT_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
         let reference_in_text_regex = REFERENCE_IN_TEXT_REGEX.get_or_init(|| {
@@ -132,6 +133,45 @@ impl Text {
             }
         }
         result_list.concat()
+    }
+
+    pub fn composed_with_aliases(
+        &self,
+        read_able_transaction: &dyn ReadTransactionMethods<'a>,
+    ) -> Result<String> {
+        let mut result_list = Vec::new();
+        if self.start_with_reference {
+            for (reference_index, reference) in self.references.iter().enumerate() {
+                result_list.push(format!(
+                    "[{}]",
+                    if let Some(alias) = read_able_transaction.get_alias_by_thesis_id(reference)? {
+                        alias.0
+                    } else {
+                        reference.to_string()
+                    }
+                ));
+                if reference_index < self.raw_text_parts.len() {
+                    result_list.push(self.raw_text_parts[reference_index].0.clone());
+                }
+            }
+        } else {
+            for (part_index, part) in self.raw_text_parts.iter().enumerate() {
+                result_list.push(part.0.clone());
+                if part_index < self.references.len() {
+                    result_list.push(format!(
+                        "[{}]",
+                        if let Some(alias) = read_able_transaction
+                            .get_alias_by_thesis_id(&self.references[part_index])?
+                        {
+                            alias.0
+                        } else {
+                            self.references[part_index].to_string()
+                        }
+                    ));
+                }
+            }
+        }
+        Ok(result_list.concat())
     }
 
     pub fn validated(&self) -> Result<&Self> {

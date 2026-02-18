@@ -5,12 +5,12 @@ use trove::ObjectId;
 use crate::{alias::Alias, commands::Reference, read_transaction::ReadTransactionMethods};
 
 pub struct AliasesResolver<'a> {
-    pub read_able_transaction: &'a dyn ReadTransactionMethods,
+    pub read_able_transaction: &'a dyn ReadTransactionMethods<'a>,
     pub known_aliases: BTreeMap<Alias, ObjectId>,
 }
 
 impl<'a> AliasesResolver<'a> {
-    pub fn get_thesis_id_by_reference(&mut self, reference: &Reference) -> Result<ObjectId> {
+    pub fn get_thesis_id_by_reference(&self, reference: &Reference) -> Result<ObjectId> {
         Ok(match reference {
             Reference::ObjectId(thesis_id) => {
                 if self.read_able_transaction.get_thesis(thesis_id)?.is_none() {

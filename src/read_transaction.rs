@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Error, Result};
 use fallible_iterator::FallibleIterator;
 use trove::{path_segments, IndexRecordType, ObjectId};
 
@@ -13,7 +13,7 @@ pub struct ReadTransaction<'a> {
 
 #[macro_export]
 macro_rules! define_read_methods {
-    () => {
+    ($lifetime:lifetime) => {
         fn get_thesis(&self, thesis_id: &ObjectId) -> Result<Option<Thesis>> {
             if let Some(thesis_json_value) = self.chest_transaction.get(thesis_id, &vec![])? {
                 Ok(Some(serde_json::from_value(thesis_json_value).unwrap()))
@@ -69,15 +69,40 @@ macro_rules! define_read_methods {
                 )?)
                 .collect()
         }
+
+        fn get_alias_by_thesis_id(&self, thesis_id: &ObjectId) -> Result<Option<Alias>> {
+            Ok(
+                if let Some(json_value) = self
+                    .chest_transaction
+                    .get(thesis_id, &path_segments!("alias"))?
+                {
+                    serde_json::from_value(json_value)?
+                } else {
+                    None
+                },
+            )
+        }
+
+        fn iter_theses(
+            &self,
+        ) -> Result<Box<dyn FallibleIterator<Item = Thesis, Error = Error> + '_>> {
+            Ok(Box::new(
+                self.chest_transaction
+                    .objects()?
+                    .map(|object| Ok(serde_json::from_value(object.value)?)),
+            ))
+        }
     };
 }
 
-pub trait ReadTransactionMethods {
+pub trait ReadTransactionMethods<'a> {
     fn get_thesis(&self, thesis_id: &ObjectId) -> Result<Option<Thesis>>;
     fn get_thesis_id_by_alias(&self, alias: &Alias) -> Result<Option<ObjectId>>;
+    fn get_alias_by_thesis_id(&self, thesis_id: &ObjectId) -> Result<Option<Alias>>;
     fn where_referenced(&self, thesis_id: &ObjectId) -> Result<Vec<ObjectId>>;
+    fn iter_theses(&self) -> Result<Box<dyn FallibleIterator<Item = Thesis, Error = Error> + '_>>;
 }
 
-impl ReadTransactionMethods for ReadTransaction<'_> {
-    define_read_methods!();
+impl<'a> ReadTransactionMethods<'a> for ReadTransaction<'a> {
+    define_read_methods!('a);
 }

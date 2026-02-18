@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use fallible_iterator::FallibleIterator;
 use trove::{path_segments, IndexRecordType, Object, ObjectId};
 
@@ -17,12 +17,12 @@ pub struct WriteTransaction<'a, 'b, 'c, 'd> {
     pub sweater_config: SweaterConfig,
 }
 
-impl ReadTransactionMethods for WriteTransaction<'_, '_, '_, '_> {
-    define_read_methods!();
+impl<'a, 'b, 'c, 'd> ReadTransactionMethods<'a> for WriteTransaction<'a, 'b, 'c, 'd> {
+    define_read_methods!('a);
 }
 
-impl<'a, 'b, 'c, 'd> ReadTransactionMethods for &mut WriteTransaction<'a, 'b, 'c, 'd> {
-    define_read_methods!();
+impl<'a, 'b, 'c, 'd> ReadTransactionMethods<'a> for &mut WriteTransaction<'a, 'b, 'c, 'd> {
+    define_read_methods!('a);
 }
 
 impl WriteTransaction<'_, '_, '_, '_> {

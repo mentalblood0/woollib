@@ -3,6 +3,7 @@ use fallible_iterator::FallibleIterator;
 use serde::{Deserialize, Serialize};
 
 use crate::content::Content;
+use crate::read_transaction::ReadTransactionMethods;
 use crate::thesis::Thesis;
 
 #[derive(PartialEq, Eq, Serialize, Deserialize)]
@@ -34,20 +35,22 @@ pub enum Stage {
 
 pub struct GraphGenerator<'a> {
     pub config: &'a GraphGeneratorConfig,
-    pub theses_iterator: &'a mut dyn FallibleIterator<Item = Thesis, Error = Error>,
+    pub read_able_transaction: &'a dyn ReadTransactionMethods<'a>,
+    pub theses_iterator: Box<dyn FallibleIterator<Item = Thesis, Error = Error> + 'a>,
     pub stage: Stage,
 }
 
 impl<'a> GraphGenerator<'a> {
     pub fn new(
         config: &'a GraphGeneratorConfig,
-        theses_iterator: &'a mut dyn FallibleIterator<Item = Thesis, Error = Error>,
-    ) -> Self {
-        Self {
+        read_able_transaction: &'a dyn ReadTransactionMethods<'a>,
+    ) -> Result<Self> {
+        Ok(Self {
             config,
-            theses_iterator,
+            read_able_transaction,
+            theses_iterator: Box::new(read_able_transaction.iter_theses()?),
             stage: Stage::BeforeFirstLine,
-        }
+        })
     }
 }
 
@@ -117,7 +120,8 @@ impl<'a> FallibleIterator for GraphGenerator<'a> {
                     };
                     match thesis.content {
                         Content::Text(ref text) => {
-                            let node_body_text = self.wrap(&text.composed());
+                            let node_body_text =
+                                self.wrap(&text.composed_with_aliases(self.read_able_transaction)?);
                             let node_header = format!(
                                 r#"<TR><TD BORDER="1" SIDES="b">{node_header_text}</TD></TR>"#,
                             );

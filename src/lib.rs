@@ -295,11 +295,8 @@ mod tests {
                             externalize_relations_nodes: ExternalizeRelationsNodes::None,
                             show_nodes_references: ShowNodesReferences::All,
                         },
-                        &mut transaction
-                            .chest_transaction
-                            .objects()?
-                            .map(|object| Ok(serde_json::from_value(object.value)?)),
-                    )
+                        transaction,
+                    )?
                     .collect::<Vec<_>>()?
                     .join(""),
                 )?;
