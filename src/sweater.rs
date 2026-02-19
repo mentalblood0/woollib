@@ -32,9 +32,9 @@ impl Sweater {
         })
     }
 
-    pub fn lock_all_and_write<'a, F>(&'a mut self, mut f: F) -> Result<&'a mut Self>
+    pub fn lock_all_and_write<'a, F, R>(&'a mut self, mut f: F) -> Result<R>
     where
-        F: FnMut(&mut WriteTransaction<'_, '_, '_, '_>) -> Result<()>,
+        F: FnMut(&mut WriteTransaction<'_, '_, '_, '_>) -> Result<R>,
     {
         self.chest
             .lock_all_and_write(|chest_write_transaction| {
@@ -43,14 +43,12 @@ impl Sweater {
                     sweater_config: self.config.clone(),
                 })
             })
-            .with_context(|| "Can not lock chest and initiate write transaction")?;
-
-        Ok(self)
+            .with_context(|| "Can not lock chest and initiate write transaction")
     }
 
-    pub fn lock_all_writes_and_read<F>(&self, mut f: F) -> Result<&Self>
+    pub fn lock_all_writes_and_read<F, R>(&self, mut f: F) -> Result<R>
     where
-        F: FnMut(ReadTransaction) -> Result<()>,
+        F: FnMut(ReadTransaction) -> Result<R>,
     {
         self.chest
             .lock_all_writes_and_read(|chest_read_transaction| {
@@ -61,7 +59,6 @@ impl Sweater {
             })
             .with_context(|| {
                 "Can not lock all write operations on chest and initiate read transaction"
-            })?;
-        Ok(self)
+            })
     }
 }
